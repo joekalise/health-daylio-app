@@ -66,7 +66,7 @@ function getGreeting() {
 
 export default function DashboardShell({ entries, chartData, avgScore, streak, todayLogged }: Props) {
   const [tab, setTab] = useState<Tab>(todayLogged ? "Mood" : "Today");
-  const [days, setDays] = useState<Range>(90);
+  const [days, setDays] = useState<Range>(1825);
 
   const cutoff = subDays(new Date(), days).toISOString().split("T")[0];
   const filteredEntries = entries.filter((e) => e.date >= cutoff);
