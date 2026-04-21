@@ -57,9 +57,12 @@ const WORKOUT_TYPES = {
 
 // ── Accumulators ──────────────────────────────────────────────────────────────
 
-// date → type → { sum, count }
+// date → type → sourceName → { sum, count }
+// For "sum" metrics (steps, active_energy, etc.) we keep per-source totals and
+// later pick only the highest-sum source to avoid double-counting iPhone + Watch.
 const dailyMetrics = {};
-// date → { core, deep, rem, unspecified, in_bed } in seconds
+// date → sourceName → { core, deep, rem, unspecified, in_bed } in seconds
+// Pick the source with the most detailed sleep data per night.
 const sleepByNight = {};
 // array of workout rows
 const workouts = [];
@@ -81,11 +84,12 @@ function sleepNightKey(startDateStr) {
   return d.toISOString().split("T")[0];
 }
 
-function addMetric(date, type, value) {
+function addMetric(date, type, value, source) {
   if (!dailyMetrics[date]) dailyMetrics[date] = {};
-  if (!dailyMetrics[date][type]) dailyMetrics[date][type] = { sum: 0, count: 0 };
-  dailyMetrics[date][type].sum += value;
-  dailyMetrics[date][type].count += 1;
+  if (!dailyMetrics[date][type]) dailyMetrics[date][type] = {};
+  if (!dailyMetrics[date][type][source]) dailyMetrics[date][type][source] = { sum: 0, count: 0 };
+  dailyMetrics[date][type][source].sum += value;
+  dailyMetrics[date][type][source].count += 1;
 }
 
 // ── SAX streaming parse ───────────────────────────────────────────────────────
@@ -106,7 +110,8 @@ parser.on("opentag", (node) => {
       const value = parseFloat(attrs.VALUE);
       if (isNaN(value)) return;
       const date = dateKey(attrs.STARTDATE || attrs.CREATIONDATE);
-      addMetric(date, mapping.type, value);
+      const source = attrs.SOURCENAME || "unknown";
+      addMetric(date, mapping.type, value, source);
       processed++;
       return;
     }
@@ -119,8 +124,10 @@ parser.on("opentag", (node) => {
       const durationSecs = (end - start) / 1000;
       if (durationSecs <= 0) return;
       const night = sleepNightKey(attrs.STARTDATE);
+      const source = attrs.SOURCENAME || "unknown";
       if (!sleepByNight[night]) sleepByNight[night] = {};
-      sleepByNight[night][stage] = (sleepByNight[night][stage] || 0) + durationSecs;
+      if (!sleepByNight[night][source]) sleepByNight[night][source] = {};
+      sleepByNight[night][source][stage] = (sleepByNight[night][source][stage] || 0) + durationSecs;
       processed++;
       return;
     }
@@ -152,21 +159,40 @@ const BATCH = 500;
 async function flushAll() {
   const rows = [];
 
-  // Daily aggregated metrics
+  // Daily aggregated metrics — pick best source to avoid double-counting
   for (const [date, types] of Object.entries(dailyMetrics)) {
-    for (const [type, { sum, count }] of Object.entries(types)) {
+    for (const [type, sources] of Object.entries(types)) {
       const mapping = Object.values(RECORD_TYPES).find((m) => m.type === type);
-      const value = mapping?.agg === "sum" ? sum : sum / count;
+      let value;
+      if (mapping?.agg === "sum") {
+        // Use the single source with the highest sum (avoids iPhone+Watch double-count)
+        const best = Object.values(sources).reduce((a, b) => (a.sum >= b.sum ? a : b));
+        value = best.sum;
+      } else {
+        // For averages, pool all sources together
+        const all = Object.values(sources);
+        const totalSum = all.reduce((s, v) => s + v.sum, 0);
+        const totalCount = all.reduce((s, v) => s + v.count, 0);
+        value = totalSum / totalCount;
+      }
       rows.push({ date, type, value, unit: mapping?.unit ?? null, metadata: null, source: "apple_health" });
     }
   }
 
-  // Sleep
-  for (const [date, stages] of Object.entries(sleepByNight)) {
-    const core = (stages.core || 0) / 3600;
-    const deep = (stages.deep || 0) / 3600;
-    const rem = (stages.rem || 0) / 3600;
-    const unspecified = (stages.unspecified || 0) / 3600;
+  // Sleep — pick the source with the most total sleep data per night
+  for (const [date, sources] of Object.entries(sleepByNight)) {
+    // Choose source with highest total asleep seconds (most detailed)
+    let bestSource = null;
+    let bestTotal = 0;
+    for (const [src, stages] of Object.entries(sources)) {
+      const total = Object.values(stages).reduce((s, v) => s + v, 0);
+      if (total > bestTotal) { bestTotal = total; bestSource = stages; }
+    }
+    if (!bestSource) continue;
+    const core = ((bestSource as any).core || 0) / 3600;
+    const deep = ((bestSource as any).deep || 0) / 3600;
+    const rem = ((bestSource as any).rem || 0) / 3600;
+    const unspecified = ((bestSource as any).unspecified || 0) / 3600;
     const total = core + deep + rem + unspecified;
     if (total < 0.1) continue;
     rows.push({

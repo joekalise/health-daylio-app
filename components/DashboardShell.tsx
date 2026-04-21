@@ -6,6 +6,7 @@ import MoodChart from "./MoodChart";
 import ActivityHeatmap from "./ActivityHeatmap";
 import HealthSection from "./HealthSection";
 import InsightsSection from "./InsightsSection";
+import FinanceSection from "./FinanceSection";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays } from "date-fns";
 
@@ -26,7 +27,7 @@ interface Props {
   todayLogged: boolean;
 }
 
-const TABS = ["Today", "Mood", "Health", "Insights"] as const;
+const TABS = ["Today", "Mood", "Health", "Finance", "Insights"] as const;
 type Tab = typeof TABS[number];
 
 const RANGES = [30, 90, 180, 365, 1825] as const;
@@ -204,6 +205,14 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               </a>
             </section>
           </>
+        )}
+
+        {/* FINANCE TAB */}
+        {tab === "Finance" && (
+          <section className="bg-zinc-900 rounded-2xl p-4">
+            <h2 className="font-medium mb-4">Finances</h2>
+            <FinanceSection />
+          </section>
         )}
 
         {/* INSIGHTS TAB */}

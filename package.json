@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "node --env-file=.env.local node_modules/.bin/drizzle-kit push",
     "db:studio": "node --env-file=.env.local node_modules/.bin/drizzle-kit studio",
-    "import:health": "node --env-file=.env.local node_modules/.bin/tsx scripts/import-health-xml.ts"
+    "import:health": "node --env-file=.env.local node_modules/.bin/tsx scripts/import-health-xml.ts",
+    "clear:health": "node --env-file=.env.local node_modules/.bin/tsx scripts/clear-health.ts",
+    "import:finance": "node --env-file=.env.local node_modules/.bin/tsx scripts/import-finance.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -26,7 +28,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
-    "sax": "^1.6.0"
+    "sax": "^1.6.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
