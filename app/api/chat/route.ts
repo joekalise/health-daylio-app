@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { moodEntries, healthMetrics } from "@/db/schema";
+import { moodEntries, healthMetrics, userProfile } from "@/db/schema";
 import { gte, lte, and, desc, eq } from "drizzle-orm";
 
 const client = new Anthropic();
@@ -102,13 +102,33 @@ async function runTool(name: string, input: Record<string, unknown>) {
   return "Unknown tool";
 }
 
-const SYSTEM = `You are a personal health and mood analytics assistant. You have access to the user's Apple Health data and mood tracking history (imported from Daylio).
+async function buildSystem(): Promise<string> {
+  const [profile] = await db.select().from(userProfile).limit(1);
+  const today = new Date().toISOString().split("T")[0];
+
+  let profileSection = "";
+  if (profile) {
+    const parts: string[] = [];
+    if (profile.name) parts.push(`Name: ${profile.name}`);
+    if (profile.age) parts.push(`Age: ${profile.age}`);
+    if (profile.occupation) parts.push(`Occupation: ${profile.occupation}`);
+    if (profile.location) parts.push(`Location: ${profile.location}`);
+    if (profile.healthConditions) parts.push(`Health conditions: ${profile.healthConditions}`);
+    if (profile.medications) parts.push(`Medications/supplements: ${profile.medications}`);
+    if (profile.fitnessGoals) parts.push(`Fitness goals: ${profile.fitnessGoals}`);
+    if (profile.financialGoals) parts.push(`Financial goals: ${profile.financialGoals}`);
+    if (profile.about) parts.push(`About: ${profile.about}`);
+    if (parts.length) profileSection = `\n\nUser profile:\n${parts.join("\n")}`;
+  }
+
+  return `You are a personal analytics assistant for a specific user's life dashboard. You have access to their Apple Health data, mood tracking history, and personal profile.
 
 Available data:
 - Mood entries: daily mood (rad/good/meh/bad/awful), activities, notes — going back years
-- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, VO2 max, weight
+- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, VO2 max, weight${profileSection}
 
-Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Spot patterns (e.g. "your HRV is higher on days you log 'exercise'"). Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Factor in the user's health conditions and goals when giving insights. Spot patterns (e.g. "your HRV is higher on days you log 'exercise'"). Today's date is ${today}.`;
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -124,6 +144,7 @@ export async function POST(req: NextRequest) {
 
       try {
         let apiMessages: Anthropic.MessageParam[] = messages;
+        const system = await buildSystem();
 
         // Agentic loop — Claude may call tools multiple times
         while (true) {
@@ -131,7 +152,7 @@ export async function POST(req: NextRequest) {
             model: "claude-opus-4-7",
             max_tokens: 4096,
             thinking: { type: "adaptive" },
-            system: SYSTEM,
+            system,
             tools: TOOLS,
             messages: apiMessages,
           });

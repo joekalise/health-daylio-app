@@ -7,8 +7,10 @@ import ActivityHeatmap from "./ActivityHeatmap";
 import HealthSection from "./HealthSection";
 import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
+import ProfileSection from "./ProfileSection";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays } from "date-fns";
+import Link from "next/link";
 
 interface Entry {
   id: number;
@@ -27,7 +29,7 @@ interface Props {
   todayLogged: boolean;
 }
 
-const TABS = ["Today", "Mood", "Health", "Finance", "Insights"] as const;
+const TABS = ["Today", "Mood", "Health", "Finance", "Insights", "Profile"] as const;
 type Tab = typeof TABS[number];
 
 const RANGES = [30, 90, 180, 365, 1825] as const;
@@ -176,7 +178,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               <h2 className="font-medium mb-3">Recent entries</h2>
               <div className="space-y-0">
                 {recent.map((e, i) => (
-                  <div key={e.id} className={`flex items-start gap-3 py-3 ${i < recent.length - 1 ? "border-b border-zinc-800" : ""}`}>
+                  <Link key={e.id} href={`/entries/${e.id}`} className={`flex items-start gap-3 py-3 hover:bg-zinc-800/50 -mx-1 px-1 rounded-xl transition-colors ${i < recent.length - 1 ? "border-b border-zinc-800" : ""}`}>
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 mt-0.5"
                       style={{ backgroundColor: MOOD_COLORS[e.mood] + "22" }}
@@ -193,7 +195,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                       )}
                       {e.note && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{e.note}</p>}
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>
@@ -220,6 +222,15 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           <section className="bg-zinc-900 rounded-2xl p-4">
             <h2 className="font-medium mb-4">Insights</h2>
             <InsightsSection entries={entries} />
+          </section>
+        )}
+
+        {/* PROFILE TAB */}
+        {tab === "Profile" && (
+          <section className="bg-zinc-900 rounded-2xl p-4">
+            <h2 className="font-medium mb-1">Your profile</h2>
+            <p className="text-xs text-zinc-500 mb-4">Used to personalise the AI chatbot</p>
+            <ProfileSection />
           </section>
         )}
 

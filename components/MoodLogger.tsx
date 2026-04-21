@@ -12,11 +12,11 @@ const ACTIVITY_GROUPS = [
   },
   {
     label: "🍽️ Food",
-    items: ["homemade", "restaurant", "delivery", "no sweets"],
+    items: ["homemade", "eat healthy", "restaurant", "delivery", "fast food", "no sweets", "no meat"],
   },
   {
     label: "👥 Social",
-    items: ["family", "friends", "date"],
+    items: ["family", "friends", "date", "party", "sex"],
   },
   {
     label: "💪 Fitness",
@@ -24,11 +24,15 @@ const ACTIVITY_GROUPS = [
   },
   {
     label: "💼 Work",
-    items: ["work"],
+    items: ["work", "coworking"],
+  },
+  {
+    label: "🧘 Health",
+    items: ["drink water", "sick", "anxiety attack"],
   },
   {
     label: "🚫 Avoiding",
-    items: ["no alcohol", "no drugs"],
+    items: ["no alcohol", "no drugs", "no soda"],
   },
 ];
 

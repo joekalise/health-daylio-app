@@ -10,15 +10,23 @@ export const dynamic = "force-dynamic";
 
 function calcStreak(entries: { date: string }[]): number {
   if (!entries.length) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const mostRecent = parseISO(entries[0].date);
+  // Streak is broken if most recent entry is more than 1 day ago
+  if (differenceInCalendarDays(today, mostRecent) > 1) return 0;
+  // Count consecutive days back from the most recent entry
   let streak = 0;
-  let expected = new Date();
+  let expected = new Date(mostRecent);
   expected.setHours(0, 0, 0, 0);
   for (const e of entries) {
     const d = parseISO(e.date);
-    const diff = differenceInCalendarDays(expected, d);
-    if (diff === 0) { streak++; expected.setDate(expected.getDate() - 1); }
-    else if (diff === 1 && streak === 0) { expected.setDate(expected.getDate() - 1); continue; }
-    else break;
+    if (differenceInCalendarDays(expected, d) === 0) {
+      streak++;
+      expected.setDate(expected.getDate() - 1);
+    } else {
+      break;
+    }
   }
   return streak;
 }
@@ -33,7 +41,7 @@ export default async function DashboardPage() {
     .orderBy(desc(moodEntries.date))
     .limit(3650);
 
-  const chartData = entries.slice(0, 90).map((e) => ({
+  const chartData = entries.map((e) => ({
     date: e.date,
     moodScore: e.moodScore,
     mood: e.mood,
