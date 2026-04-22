@@ -99,11 +99,11 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
       </div>
 
       {/* Activities */}
-      <div className="space-y-4 text-left">
+      <div className="space-y-4">
         {ACTIVITY_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-sm font-medium text-zinc-300 mb-2">{group.label}</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm font-medium text-zinc-300 mb-2 text-center">{group.label}</p>
+            <div className="flex flex-wrap gap-2 justify-center">
               {group.items.map((a) => (
                 <button
                   key={a}
