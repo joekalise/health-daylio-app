@@ -8,6 +8,7 @@ import HealthSection from "./HealthSection";
 import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
 import ProfileSection from "./ProfileSection";
+import ChatPanel from "./ChatPanel";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays } from "date-fns";
 import Link from "next/link";
@@ -35,6 +36,7 @@ const TABS = [
   { id: "Health", emoji: "💪" },
   { id: "Finance", emoji: "💰" },
   { id: "Insights", emoji: "✨" },
+  { id: "Chat", emoji: "💬" },
 ] as const;
 type Tab = typeof TABS[number]["id"] | "Profile";
 
@@ -120,21 +122,23 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           <Avatar photo={profile?.photo} name={profile?.name} onClick={() => setTab("Profile")} />
         </div>
 
-        {/* Stats */}
-        <div className="flex gap-2.5 mt-5">
-          <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.25)" }}>
-            <div className="text-xl font-bold text-indigo-300">{entries.length.toLocaleString()}</div>
-            <div className="text-[10px] text-indigo-400/70 mt-0.5 uppercase tracking-wide">Days logged</div>
+        {/* Stats — only shown on mood-relevant tabs */}
+        {(tab === "Today" || tab === "Mood") && (
+          <div className="flex gap-2.5 mt-5">
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.25)" }}>
+              <div className="text-xl font-bold text-indigo-300">{entries.length.toLocaleString()}</div>
+              <div className="text-[10px] text-indigo-400/70 mt-0.5 uppercase tracking-wide">Days logged</div>
+            </div>
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <div className="text-xl font-bold text-violet-300">{avgScore}</div>
+              <div className="text-[10px] text-violet-400/70 mt-0.5 uppercase tracking-wide">Avg mood</div>
+            </div>
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}>
+              <div className="text-xl font-bold text-orange-300">{streak} 🔥</div>
+              <div className="text-[10px] text-orange-400/70 mt-0.5 uppercase tracking-wide">Day streak</div>
+            </div>
           </div>
-          <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
-            <div className="text-xl font-bold text-violet-300">{avgScore}</div>
-            <div className="text-[10px] text-violet-400/70 mt-0.5 uppercase tracking-wide">Avg mood</div>
-          </div>
-          <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}>
-            <div className="text-xl font-bold text-orange-300">{streak} 🔥</div>
-            <div className="text-[10px] text-orange-400/70 mt-0.5 uppercase tracking-wide">Day streak</div>
-          </div>
-        </div>
+        )}
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-4">
@@ -160,7 +164,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                 </button>
               </div>
             ) : (
-              <div className="glass rounded-2xl p-5">
+              <div className="glass rounded-2xl p-5 text-center">
                 <h2 className="font-semibold text-lg mb-4">How are you feeling?</h2>
                 <MoodLoggerWrapper onSavedTab={() => setTab("Mood")} />
               </div>
@@ -177,11 +181,6 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                 <RangePicker value={days} onChange={setDays} />
               </div>
               <MoodChart data={filteredChartData} />
-            </section>
-
-            <section className="glass rounded-2xl p-4">
-              <h2 className="font-semibold mb-4">Activities & mood</h2>
-              <ActivityHeatmap entries={filteredEntries.map((e) => ({ activities: e.activities ?? [], moodScore: e.moodScore }))} />
             </section>
 
             <section className="glass rounded-2xl p-4">
@@ -237,6 +236,14 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           <section className="glass rounded-2xl p-4">
             <h2 className="font-semibold mb-4">Insights</h2>
             <InsightsSection entries={entries} />
+          </section>
+        )}
+
+        {/* CHAT TAB */}
+        {tab === "Chat" && (
+          <section className="glass rounded-2xl p-4">
+            <h2 className="font-semibold mb-4">Ask about your data</h2>
+            <ChatPanel />
           </section>
         )}
 

@@ -39,7 +39,7 @@ function MiniChart({ data, color, unit, formatter }: {
   if (!data.length) return <p className="text-zinc-500 text-xs">No data</p>;
   return (
     <ResponsiveContainer width="100%" height={100}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM d")} tick={tickStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={36} tickFormatter={formatter} />
@@ -69,7 +69,7 @@ function SleepBar({ data }: { data: Metric[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={100}>
-      <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+      <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM d")} tick={tickStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={36} />
@@ -96,16 +96,94 @@ function StatCard({ label, value, unit, color }: { label: string; value: string 
   );
 }
 
+function ManualEntry({ onSaved }: { onSaved: () => void }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(today);
+  const [fields, setFields] = useState({ steps: "", hrv: "", resting_hr: "", sleep_total: "", sleep_deep: "", sleep_rem: "", weight: "" });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  function set(k: keyof typeof fields, v: string) { setFields(p => ({ ...p, [k]: v })); }
+
+  async function save() {
+    setSaving(true);
+    const body: Record<string, unknown> = { date };
+    for (const [k, v] of Object.entries(fields)) {
+      const n = parseFloat(v);
+      if (!isNaN(n) && v !== "") body[k] = n;
+    }
+    await fetch("/api/health/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": "" },
+      body: JSON.stringify(body),
+    });
+    setSaving(false);
+    setSaved(true);
+    setOpen(false);
+    onSaved();
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  const inputClass = "w-full glass rounded-xl px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none";
+
+  return (
+    <div className="mt-4 pt-4 border-t border-white/5">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+      >
+        {open ? "Cancel" : saved ? "Saved ✓" : "+ Add / correct metrics"}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ["steps", "Steps"],
+              ["hrv", "HRV (ms)"],
+              ["resting_hr", "Resting HR (bpm)"],
+              ["sleep_total", "Sleep total (hr)"],
+              ["sleep_deep", "Sleep deep (hr)"],
+              ["sleep_rem", "Sleep REM (hr)"],
+              ["weight", "Weight (kg)"],
+            ] as const).map(([key, label]) => (
+              <div key={key}>
+                <label className="text-[10px] text-zinc-500 block mb-1">{label}</label>
+                <input type="number" step="any" placeholder="—" value={fields[key]} onChange={e => set(key, e.target.value)} className={inputClass} />
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+            style={{ background: "rgba(99,102,241,0.3)", border: "1px solid rgba(99,102,241,0.4)", color: "#a5b4fc" }}
+          >
+            {saving ? "Saving..." : "Save metrics"}
+          </button>
+          <p className="text-[10px] text-zinc-600">For bulk historical imports, run the CLI script with your Apple Health export XML.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HealthSection({ days }: { days: number }) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function reload() {
     setLoading(true);
     fetch(`/api/health/metrics?days=${days}`)
       .then((r) => r.json())
       .then((d) => { setMetrics(d); setLoading(false); });
-  }, [days]);
+  }
+
+  useEffect(() => { reload(); }, [days]);
 
   if (loading) return <p className="text-zinc-500 text-sm">Loading health data...</p>;
   if (!metrics.length) return <p className="text-zinc-500 text-sm">No health data yet.</p>;
@@ -170,6 +248,8 @@ export default function HealthSection({ days }: { days: number }) {
           </div>
         </div>
       )}
+
+      <ManualEntry onSaved={reload} />
     </div>
   );
 }

@@ -49,6 +49,7 @@ export const financeAccounts = pgTable("finance_accounts", {
   currency: text("currency").notNull().default("EUR"),
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  isNetWorth: boolean("is_net_worth").notNull().default(true),
 });
 
 // Monthly balance snapshots per account

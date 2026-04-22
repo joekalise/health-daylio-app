@@ -12,9 +12,13 @@ export async function GET() {
   const balances = await db.select().from(financeBalances).orderBy(desc(financeBalances.date), asc(financeBalances.accountId));
   const accounts = await db.select().from(financeAccounts).where(eq(financeAccounts.isActive, true)).orderBy(asc(financeAccounts.displayOrder));
 
-  // Group balances by date for net worth history
+  // Net worth accounts only
+  const netWorthAccountIds = new Set(accounts.filter(a => a.isNetWorth).map(a => a.id));
+
+  // Group balances by date for net worth history (only net worth accounts)
   const byDate: Record<string, Record<number, number>> = {};
   for (const b of balances) {
+    if (!netWorthAccountIds.has(b.accountId)) continue;
     if (!byDate[b.date]) byDate[b.date] = {};
     byDate[b.date][b.accountId] = b.amount;
   }

@@ -141,6 +141,50 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   const topActivities = Object.entries(actMap).filter(([, v]) => v.count >= 5).map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count })).sort((a, b) => b.avg - a.avg).slice(0, 8);
   const worstActivities = Object.entries(actMap).filter(([, v]) => v.count >= 5).map(([name, v]) => ({ name, avg: v.total / v.count, count: v.count })).sort((a, b) => a.avg - b.avg).slice(0, 3);
 
+  // ── Lagged correlations (mood X days AFTER activity) ────────────────────────
+  const entryByDate: Record<string, Entry> = {};
+  for (const e of entries) entryByDate[e.date] = e;
+
+  function laggedCorr(activity: string, lagDays: number[]) {
+    const withActivity: number[] = [];
+    const baseline: number[] = [];
+    const activityDates = new Set(entries.filter(e => (e.activities ?? []).includes(activity)).map(e => e.date));
+
+    for (const e of entries) {
+      const d = parseISO(e.date);
+      const hadActivity = lagDays.some(lag => {
+        const prior = subDays(d, lag).toISOString().split("T")[0];
+        return activityDates.has(prior);
+      });
+      if (hadActivity) withActivity.push(e.moodScore);
+      else baseline.push(e.moodScore);
+    }
+    if (withActivity.length < 5 || baseline.length < 5) return null;
+    return {
+      after: withActivity.reduce((s, v) => s + v, 0) / withActivity.length,
+      baseline: baseline.reduce((s, v) => s + v, 0) / baseline.length,
+      n: withActivity.length,
+    };
+  }
+
+  const LAGGED_ACTIVITIES = [
+    { key: "exercise", label: "Exercise", positive: true },
+    { key: "no alcohol", label: "No alcohol", positive: true },
+    { key: "no drugs", label: "No drugs", positive: true },
+    { key: "anxiety attack", label: "Anxiety attack", positive: false },
+    { key: "sick", label: "Sick", positive: false },
+    { key: "alcohol", label: "Alcohol", positive: false },
+    { key: "drugs", label: "Drugs", positive: false },
+  ];
+
+  const laggedResults = LAGGED_ACTIVITIES.map(({ key, label, positive }) => {
+    const r = laggedCorr(key, [1, 2]);
+    if (!r) return null;
+    const diff = r.after - r.baseline;
+    if (Math.abs(diff) < 0.05) return null;
+    return { label, diff, after: r.after, baseline: r.baseline, n: r.n, positive };
+  }).filter(Boolean).sort((a, b) => Math.abs(b!.diff) - Math.abs(a!.diff));
+
   // ── Health / mood correlations ──────────────────────────────────────────────
   const moodByDate: Record<string, number> = {};
   for (const e of entries) moodByDate[e.date] = e.moodScore;
@@ -203,6 +247,26 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
         </div>
       )}
 
+      {/* Delayed effects (lagged correlations) */}
+      {laggedResults.length > 0 && (
+        <div>
+          <SectionHeader title="Delayed effects (1–2 days later)" />
+          <div className="glass rounded-2xl p-4 space-y-1">
+            {laggedResults.map((r) => r && (
+              <CorrelationBar
+                key={r.label}
+                label={r.label}
+                high={r.after}
+                low={r.baseline}
+                highLabel="days after"
+                lowLabel="other days"
+              />
+            ))}
+          </div>
+          <p className="text-[10px] text-zinc-600 mt-2 px-1">Mood 1–2 days after each activity vs days with no recent history of it</p>
+        </div>
+      )}
+
       {/* Health → Mood correlations */}
       {(sleepCorr || stepsCorr || hrvCorr) && (
         <div>
@@ -262,7 +326,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
         <SectionHeader title="Mood by day of week" />
         <div className="glass rounded-2xl p-4">
           <ResponsiveContainer width="100%" height={100}>
-            <BarChart data={dowData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <BarChart data={dowData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="day" tick={tickStyle} tickLine={false} axisLine={false} />
               <YAxis domain={[1, 5]} tick={tickStyle} tickLine={false} axisLine={false} width={36} />
@@ -283,7 +347,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
         <SectionHeader title="Mood by month" />
         <div className="glass rounded-2xl p-4">
           <ResponsiveContainer width="100%" height={100}>
-            <BarChart data={monthData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <BarChart data={monthData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="month" tick={tickStyle} tickLine={false} axisLine={false} />
               <YAxis domain={[1, 5]} tick={tickStyle} tickLine={false} axisLine={false} width={36} />
@@ -302,7 +366,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
           <SectionHeader title="Year over year" />
           <div className="glass rounded-2xl p-4">
             <ResponsiveContainer width="100%" height={100}>
-              <BarChart data={yearData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <BarChart data={yearData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="year" tick={tickStyle} tickLine={false} axisLine={false} />
                 <YAxis domain={[1, 5]} tick={tickStyle} tickLine={false} axisLine={false} width={36} />

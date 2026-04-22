@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { healthMetrics } from "@/db/schema";
+import { auth } from "@/lib/auth";
 
 // Simple flat payload from iOS Shortcuts
 interface ShortcutsPayload {
@@ -21,7 +22,8 @@ interface ShortcutsPayload {
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
-  if (apiKey !== process.env.INGEST_API_KEY) {
+  const session = await auth();
+  if (apiKey !== process.env.INGEST_API_KEY && !session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

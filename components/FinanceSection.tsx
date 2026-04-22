@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 
-interface Account { id: number; name: string; type: string; currency: string; displayOrder: number; }
+interface Account { id: number; name: string; type: string; currency: string; displayOrder: number; isNetWorth: boolean; }
 interface BudgetEntry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
 interface BalanceData {
   accounts: Account[];
@@ -125,17 +125,21 @@ export default function FinanceSection() {
 
   const { accounts, latestByAccount, history } = balData;
   const income = budgetEntries.filter(e => e.category === "income");
-  const expenses = budgetEntries.filter(e => e.category === "expense");
+  const allExpenses = budgetEntries.filter(e => e.category === "expense");
+  const expenses = allExpenses.filter(e => (e.metadata as any)?.type !== "S");
+  const savingsItems = allExpenses.filter(e => (e.metadata as any)?.type === "S");
 
   const monthlyIncome = income.reduce((s, e) => s + e.value, 0);
   const monthlyExpenses = expenses.reduce((s, e) => s + e.value, 0);
-  const monthlySurplus = monthlyIncome - monthlyExpenses;
-  const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome) * 100 : 0;
+  const monthlySavingsAllocated = savingsItems.reduce((s, e) => s + e.value, 0);
+  const monthlySurplus = monthlyIncome - monthlyExpenses - monthlySavingsAllocated;
+  const savingsRate = monthlyIncome > 0 ? (monthlySavingsAllocated / monthlyIncome) * 100 : 0;
 
-  // Net worth from manual balances
-  const netWorth = accounts.reduce((s, a) => s + (latestByAccount[a.id] ?? 0), 0);
+  // Net worth from net-worth accounts only
+  const netWorthAccounts = accounts.filter(a => a.isNetWorth);
+  const netWorth = netWorthAccounts.reduce((s, a) => s + (latestByAccount[a.id] ?? 0), 0);
   const byType: Record<string, number> = {};
-  for (const acc of accounts) byType[acc.type] = (byType[acc.type] ?? 0) + (latestByAccount[acc.id] ?? 0);
+  for (const acc of netWorthAccounts) byType[acc.type] = (byType[acc.type] ?? 0) + (latestByAccount[acc.id] ?? 0);
 
   // Expense groups for pie
   const expenseGroups: Record<string, number> = {};
@@ -149,7 +153,7 @@ export default function FinanceSection() {
   const annualExpenses = monthlyExpenses * 12;
   const fireTarget = annualExpenses * 25;
   const currentInvested = (byType.investment ?? 0) + (byType.pension ?? 0);
-  const monthlyInvestment = Math.max(0, monthlySurplus * 0.8); // assume 80% of surplus goes to investments
+  const monthlyInvestment = Math.max(0, monthlySavingsAllocated);
   const yearsLeft = yearsToFIRE(currentInvested, monthlyInvestment, fireTarget);
   const firePct = fireTarget > 0 ? Math.min((currentInvested / fireTarget) * 100, 100) : 0;
 
@@ -199,10 +203,10 @@ export default function FinanceSection() {
         <GlassCard>
           <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Net Worth History</h3>
           <ResponsiveContainer width="100%" height={120}>
-            <LineChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+            <LineChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM yy")} tick={tickStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+              <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
               <Tooltip contentStyle={tooltipStyle} labelFormatter={(d) => format(parseISO(d as string), "MMM d, yyyy")} formatter={(v) => [EUR(Number(v)), "Net Worth"]} />
               <Line type="monotone" dataKey="netWorth" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: "#22c55e" }} />
             </LineChart>
@@ -214,10 +218,11 @@ export default function FinanceSection() {
       {monthlyIncome > 0 && (
         <GlassCard>
           <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Monthly Budget</h3>
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="grid grid-cols-2 gap-2 mb-4">
             <StatCard label="Income" value={EUR(monthlyIncome)} color="#22c55e" />
             <StatCard label="Expenses" value={EUR(monthlyExpenses)} color="#f97316" />
-            <StatCard label="Surplus" value={EUR(monthlySurplus)} color={monthlySurplus >= 0 ? "#6366f1" : "#ef4444"} />
+            <StatCard label="Savings & Investments" value={EUR(monthlySavingsAllocated)} color="#8b5cf6" />
+            <StatCard label="Unallocated" value={EUR(monthlySurplus)} color={monthlySurplus >= 0 ? "#6366f1" : "#ef4444"} />
           </div>
           {/* Savings rate */}
           <div>
@@ -226,12 +231,24 @@ export default function FinanceSection() {
               <span className="text-white font-medium">{pct(savingsRate)}</span>
             </div>
             <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(savingsRate, 100))}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)" }} />
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(savingsRate, 100))}%`, background: "linear-gradient(90deg, #8b5cf6, #6366f1)" }} />
             </div>
             <p className="text-[10px] text-zinc-600 mt-1">
-              {savingsRate >= 20 ? "Great savings rate!" : savingsRate >= 10 ? "Good — aim for 20%+" : "Try to save more each month"}
+              {savingsRate >= 30 ? "Excellent savings rate!" : savingsRate >= 20 ? "Great savings rate!" : savingsRate >= 10 ? "Good — aim for 20%+" : "Try to save more each month"}
             </p>
           </div>
+          {/* Savings breakdown */}
+          {savingsItems.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-white/5">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-2">Savings breakdown</p>
+              {savingsItems.map(e => (
+                <div key={e.id} className="flex justify-between text-xs py-1">
+                  <span className="text-zinc-400">{e.name}</span>
+                  <span className="text-zinc-300">{EUR(e.value)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </GlassCard>
       )}
 
@@ -349,19 +366,22 @@ export default function FinanceSection() {
                 {TYPE_LABELS[type]}
               </p>
               {grouped[type].map((acc) => (
-                <div key={acc.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                  <span className="text-sm text-zinc-300">{acc.name}</span>
+                <div key={acc.id} className={`flex items-center justify-between py-2 border-b border-white/5 last:border-0 ${!acc.isNetWorth ? "opacity-50" : ""}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm text-zinc-300 truncate">{acc.name}</span>
+                    {!acc.isNetWorth && <span className="text-[10px] text-zinc-600 flex-shrink-0">excl.</span>}
+                  </div>
                   {editing ? (
                     <input
                       type="number"
                       value={draftBalances[acc.id] ?? ""}
                       onChange={(e) => setDraftBalances(p => ({ ...p, [acc.id]: e.target.value }))}
-                      className="w-28 glass rounded-lg px-2.5 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500"
+                      className="w-28 glass rounded-lg px-2.5 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500 flex-shrink-0"
                       placeholder="0.00"
                       step="0.01"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-white">
+                    <span className="text-sm font-medium text-white flex-shrink-0">
                       {latestByAccount[acc.id] != null ? EUR(latestByAccount[acc.id]) : <span className="text-zinc-600">—</span>}
                     </span>
                   )}
