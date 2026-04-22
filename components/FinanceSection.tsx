@@ -1,55 +1,69 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
+  CartesianGrid, PieChart, Pie, Cell, BarChart, Bar,
+} from "recharts";
 import { format, parseISO } from "date-fns";
 
-interface Account {
-  id: number;
-  name: string;
-  type: string;
-  currency: string;
-  displayOrder: number;
-}
-
+interface Account { id: number; name: string; type: string; currency: string; displayOrder: number; }
+interface BudgetEntry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
 interface BalanceData {
   accounts: Account[];
   latestByAccount: Record<number, number>;
   history: { date: string; netWorth: number }[];
 }
 
-const tooltipStyle = { backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 };
-const tickStyle = { fill: "#71717a", fontSize: 11 };
-
-const TYPE_LABELS: Record<string, string> = {
-  current: "Current Accounts",
-  savings: "Savings",
-  investment: "Investments",
-  pension: "Pension / Retirement",
-};
+const tooltipStyle = { backgroundColor: "#07070f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 };
+const tickStyle = { fill: "#52525b", fontSize: 11 };
 
 const TYPE_COLORS: Record<string, string> = {
-  current: "#6366f1",
-  savings: "#22c55e",
-  investment: "#f97316",
-  pension: "#8b5cf6",
+  current: "#6366f1", savings: "#22c55e", investment: "#f97316", pension: "#8b5cf6",
 };
+const TYPE_LABELS: Record<string, string> = {
+  current: "Current", savings: "Savings", investment: "Investments", pension: "Pension",
+};
+const PIE_COLORS = ["#6366f1","#8b5cf6","#a78bfa","#ec4899","#f97316","#facc15","#4ade80","#22d3ee","#f472b6","#fb7185"];
 
 const EUR = (v: number) =>
   new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
-function StatCard({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) {
+function pct(v: number) { return v.toFixed(1) + "%"; }
+
+function yearsToFIRE(current: number, monthlyContrib: number, target: number, annualReturn = 0.07): number | null {
+  if (current >= target) return 0;
+  if (monthlyContrib <= 0) return null;
+  const r = annualReturn / 12;
+  let bal = current;
+  for (let m = 1; m <= 600; m++) {
+    bal = bal * (1 + r) + monthlyContrib;
+    if (bal >= target) return +(m / 12).toFixed(1);
+  }
+  return null;
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="bg-zinc-800 rounded-2xl p-4 text-center">
-      <div className="text-xs text-zinc-500 mb-1">{label}</div>
-      <div className="text-2xl font-bold" style={{ color: color ?? "#fff" }}>{value}</div>
-      {sub && <div className="text-xs text-zinc-500 mt-0.5">{sub}</div>}
+    <div className={`glass rounded-2xl p-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div className="rounded-2xl p-3 text-center" style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+      <div className="text-xs mb-0.5" style={{ color: `${color}99` }}>{label}</div>
+      <div className="font-bold text-base text-white">{value}</div>
+      {sub && <div className="text-[10px] mt-0.5" style={{ color: `${color}70` }}>{sub}</div>}
     </div>
   );
 }
 
 export default function FinanceSection() {
-  const [data, setData] = useState<BalanceData | null>(null);
+  const [balData, setBalData] = useState<BalanceData | null>(null);
+  const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([]);
   const [editing, setEditing] = useState(false);
   const [draftBalances, setDraftBalances] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
@@ -58,20 +72,21 @@ export default function FinanceSection() {
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const r = await fetch("/api/finance/balances");
-    const d = await r.json();
-    setData(d);
+    const [b, f] = await Promise.all([
+      fetch("/api/finance/balances").then(r => r.json()),
+      fetch("/api/finance").then(r => r.json()),
+    ]);
+    setBalData(b);
+    setBudgetEntries(f.entries ?? []);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
 
   function startEditing() {
-    if (!data) return;
+    if (!balData) return;
     const draft: Record<number, string> = {};
-    for (const acc of data.accounts) {
-      draft[acc.id] = data.latestByAccount[acc.id]?.toString() ?? "";
-    }
+    for (const acc of balData.accounts) draft[acc.id] = balData.latestByAccount[acc.id]?.toString() ?? "";
     setDraftBalances(draft);
     setEditing(true);
   }
@@ -83,11 +98,10 @@ export default function FinanceSection() {
       const n = parseFloat(val);
       if (!isNaN(n)) balances[Number(id)] = n;
     }
-    const today = new Date().toISOString().split("T")[0];
     await fetch("/api/finance/balances", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ balances, date: today }),
+      body: JSON.stringify({ balances, date: new Date().toISOString().split("T")[0] }),
     });
     await load();
     setEditing(false);
@@ -99,17 +113,52 @@ export default function FinanceSection() {
     await fetch("/api/finance/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newAccount, displayOrder: (data?.accounts.length ?? 0) + 1 }),
+      body: JSON.stringify({ ...newAccount, displayOrder: (balData?.accounts.length ?? 0) + 1 }),
     });
     setNewAccount({ name: "", type: "current", currency: "EUR" });
     setAddingAccount(false);
     await load();
   }
 
-  if (loading) return <p className="text-zinc-500 text-sm text-center py-8">Loading finances...</p>;
-  if (!data) return null;
+  if (loading) return <p className="text-zinc-500 text-sm text-center py-12">Loading...</p>;
+  if (!balData) return null;
 
-  const { accounts, latestByAccount, history } = data;
+  const { accounts, latestByAccount, history } = balData;
+  const income = budgetEntries.filter(e => e.category === "income");
+  const expenses = budgetEntries.filter(e => e.category === "expense");
+
+  const monthlyIncome = income.reduce((s, e) => s + e.value, 0);
+  const monthlyExpenses = expenses.reduce((s, e) => s + e.value, 0);
+  const monthlySurplus = monthlyIncome - monthlyExpenses;
+  const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome) * 100 : 0;
+
+  // Net worth from manual balances
+  const netWorth = accounts.reduce((s, a) => s + (latestByAccount[a.id] ?? 0), 0);
+  const byType: Record<string, number> = {};
+  for (const acc of accounts) byType[acc.type] = (byType[acc.type] ?? 0) + (latestByAccount[acc.id] ?? 0);
+
+  // Expense groups for pie
+  const expenseGroups: Record<string, number> = {};
+  for (const e of expenses) {
+    const g = (e.metadata as any)?.group || "Other";
+    expenseGroups[g] = (expenseGroups[g] ?? 0) + e.value;
+  }
+  const pieData = Object.entries(expenseGroups).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value: Math.round(value) }));
+
+  // FIRE
+  const annualExpenses = monthlyExpenses * 12;
+  const fireTarget = annualExpenses * 25;
+  const currentInvested = (byType.investment ?? 0) + (byType.pension ?? 0);
+  const monthlyInvestment = Math.max(0, monthlySurplus * 0.8); // assume 80% of surplus goes to investments
+  const yearsLeft = yearsToFIRE(currentInvested, monthlyInvestment, fireTarget);
+  const firePct = fireTarget > 0 ? Math.min((currentInvested / fireTarget) * 100, 100) : 0;
+
+  // Budget breakdown bar data
+  const budgetBarData = [
+    { label: "Income", value: monthlyIncome, color: "#22c55e" },
+    { label: "Expenses", value: monthlyExpenses, color: "#f97316" },
+    { label: "Surplus", value: Math.max(0, monthlySurplus), color: "#6366f1" },
+  ];
 
   // Group accounts by type
   const grouped: Record<string, Account[]> = {};
@@ -118,67 +167,174 @@ export default function FinanceSection() {
     grouped[acc.type].push(acc);
   }
 
-  const netWorth = accounts.reduce((s, a) => s + (latestByAccount[a.id] ?? 0), 0);
-
-  const byType: Record<string, number> = {};
-  for (const acc of accounts) {
-    byType[acc.type] = (byType[acc.type] ?? 0) + (latestByAccount[acc.id] ?? 0);
-  }
-
   const hasHistory = history.length > 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Net worth hero */}
-      <div className="text-center py-2">
-        <div className="text-xs text-zinc-500 mb-1">Net Worth</div>
-        <div className="text-4xl font-bold text-white">{EUR(netWorth)}</div>
-        {history.length > 1 && (() => {
+      <GlassCard className="text-center py-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Net Worth</p>
+        <p className="text-4xl font-bold grad-text">{EUR(netWorth)}</p>
+        {hasHistory && (() => {
           const prev = history[history.length - 2]?.netWorth ?? 0;
           const delta = netWorth - prev;
           return (
-            <div className={`text-sm mt-1 ${delta >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            <p className={`text-sm mt-2 ${delta >= 0 ? "text-emerald-400" : "text-red-400"}`}>
               {delta >= 0 ? "↑" : "↓"} {EUR(Math.abs(delta))} since last snapshot
-            </div>
+            </p>
           );
         })()}
-      </div>
+        <div className="grid grid-cols-4 gap-2 mt-4">
+          {Object.entries(TYPE_LABELS).filter(([t]) => byType[t] !== undefined).map(([type, label]) => (
+            <div key={type} className="rounded-xl p-2 text-center" style={{ background: `${TYPE_COLORS[type]}15`, border: `1px solid ${TYPE_COLORS[type]}25` }}>
+              <div className="text-xs font-medium text-white">{EUR(byType[type] ?? 0)}</div>
+              <div className="text-[10px] mt-0.5" style={{ color: `${TYPE_COLORS[type]}99` }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
 
-      {/* Summary by type */}
-      <div className="grid grid-cols-2 gap-2">
-        {Object.entries(TYPE_LABELS).filter(([type]) => grouped[type]).map(([type, label]) => (
-          <StatCard key={type} label={label} value={EUR(byType[type] ?? 0)} color={TYPE_COLORS[type]} />
-        ))}
-      </div>
-
-      {/* Net worth history chart */}
+      {/* Net worth history */}
       {hasHistory && (
-        <div>
-          <h3 className="text-xs font-medium text-zinc-400 mb-2">Net worth over time</h3>
+        <GlassCard>
+          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Net Worth History</h3>
           <ResponsiveContainer width="100%" height={120}>
             <LineChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM yy")} tick={tickStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
               <Tooltip contentStyle={tooltipStyle} labelFormatter={(d) => format(parseISO(d as string), "MMM d, yyyy")} formatter={(v) => [EUR(Number(v)), "Net Worth"]} />
               <Line type="monotone" dataKey="netWorth" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: "#22c55e" }} />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+        </GlassCard>
+      )}
+
+      {/* Budget overview */}
+      {monthlyIncome > 0 && (
+        <GlassCard>
+          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Monthly Budget</h3>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatCard label="Income" value={EUR(monthlyIncome)} color="#22c55e" />
+            <StatCard label="Expenses" value={EUR(monthlyExpenses)} color="#f97316" />
+            <StatCard label="Surplus" value={EUR(monthlySurplus)} color={monthlySurplus >= 0 ? "#6366f1" : "#ef4444"} />
+          </div>
+          {/* Savings rate */}
+          <div>
+            <div className="flex justify-between text-xs mb-1.5">
+              <span className="text-zinc-500">Savings rate</span>
+              <span className="text-white font-medium">{pct(savingsRate)}</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(savingsRate, 100))}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)" }} />
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-1">
+              {savingsRate >= 20 ? "Great savings rate!" : savingsRate >= 10 ? "Good — aim for 20%+" : "Try to save more each month"}
+            </p>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Expense breakdown */}
+      {pieData.length > 0 && (
+        <GlassCard>
+          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Expense Breakdown</h3>
+          <div className="flex gap-4 items-center">
+            <ResponsiveContainer width={110} height={110}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={28} outerRadius={50} strokeWidth={0}>
+                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [EUR(Number(v)), ""]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex-1 space-y-1.5 min-w-0">
+              {pieData.slice(0, 6).map(({ name, value }, i) => (
+                <div key={name} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                  <span className="text-xs text-zinc-300 truncate flex-1">{name}</span>
+                  <span className="text-xs text-zinc-500">{EUR(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* FIRE Progress */}
+      {fireTarget > 0 && (
+        <GlassCard>
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">FIRE Progress</h3>
+              <p className="text-[10px] text-zinc-600 mt-0.5">Financial Independence / Retire Early</p>
+            </div>
+            {yearsLeft !== null && (
+              <div className="text-right">
+                <span className="text-lg font-bold text-violet-300">{yearsLeft}y</span>
+                <p className="text-[10px] text-zinc-600">to go</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-zinc-500">Current invested</span>
+              <span className="text-white">{EUR(currentInvested)}</span>
+            </div>
+            <div className="flex justify-between text-xs mb-2">
+              <span className="text-zinc-500">FIRE target (25× expenses)</span>
+              <span className="text-white">{EUR(fireTarget)}</span>
+            </div>
+            <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all relative overflow-hidden"
+                style={{ width: `${firePct}%`, background: "linear-gradient(90deg, #8b5cf6, #6366f1)" }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+              </div>
+            </div>
+            <div className="flex justify-between text-[10px] text-zinc-600">
+              <span>{pct(firePct)} there</span>
+              <span>{EUR(fireTarget - currentInvested)} remaining</span>
+            </div>
+          </div>
+          {/* Projection chart */}
+          {yearsLeft !== null && (() => {
+            const projData: { year: number; balance: number }[] = [];
+            const r = 0.07 / 12;
+            let bal = currentInvested;
+            for (let m = 0; m <= Math.ceil(yearsLeft * 12); m += 6) {
+              projData.push({ year: +(m / 12).toFixed(1), balance: bal });
+              for (let i = 0; i < 6; i++) bal = bal * (1 + r) + monthlyInvestment;
+            }
+            projData.push({ year: yearsLeft, balance: fireTarget });
+            return (
+              <div className="mt-3">
+                <ResponsiveContainer width="100%" height={80}>
+                  <LineChart data={projData} margin={{ top: 2, right: 4, bottom: 0, left: -10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="year" tick={tickStyle} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}y`} />
+                    <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={45} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => [EUR(Number(v)), "Balance"]} labelFormatter={(v) => `Year ${v}`} />
+                    <Line type="monotone" dataKey="balance" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
+        </GlassCard>
       )}
 
       {/* Account balances */}
-      <div>
+      <GlassCard>
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs font-medium text-zinc-400">Balances</h3>
+          <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Account Balances</h3>
           {!editing ? (
-            <button onClick={startEditing} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-              Update balances
-            </button>
+            <button onClick={startEditing} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Update</button>
           ) : (
-            <div className="flex gap-2">
-              <button onClick={() => setEditing(false)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</button>
-              <button onClick={saveSnapshot} disabled={saving} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg transition-colors disabled:opacity-50">
+            <div className="flex gap-3">
+              <button onClick={() => setEditing(false)} className="text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
+              <button onClick={saveSnapshot} disabled={saving} className="text-xs bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 px-3 py-1 rounded-lg transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save snapshot"}
               </button>
             </div>
@@ -186,90 +342,66 @@ export default function FinanceSection() {
         </div>
 
         <div className="space-y-4">
-          {Object.entries(TYPE_LABELS).filter(([type]) => grouped[type]).map(([type, label]) => (
+          {(["current","savings","investment","pension"] as const).filter(t => grouped[t]).map((type) => (
             <div key={type}>
-              <p className="text-xs text-zinc-600 mb-2 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: TYPE_COLORS[type] }} />
-                {label}
+              <p className="text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: `${TYPE_COLORS[type]}80` }}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: TYPE_COLORS[type] }} />
+                {TYPE_LABELS[type]}
               </p>
-              <div className="space-y-1">
-                {grouped[type].map((acc) => (
-                  <div key={acc.id} className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0">
-                    <span className="text-sm text-zinc-300">{acc.name}</span>
-                    {editing ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-zinc-600">{acc.currency}</span>
-                        <input
-                          type="number"
-                          value={draftBalances[acc.id] ?? ""}
-                          onChange={(e) => setDraftBalances((p) => ({ ...p, [acc.id]: e.target.value }))}
-                          className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500"
-                          placeholder="0.00"
-                          step="0.01"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-sm font-medium text-white">
-                        {latestByAccount[acc.id] != null ? EUR(latestByAccount[acc.id]) : <span className="text-zinc-600">—</span>}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {grouped[type].map((acc) => (
+                <div key={acc.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                  <span className="text-sm text-zinc-300">{acc.name}</span>
+                  {editing ? (
+                    <input
+                      type="number"
+                      value={draftBalances[acc.id] ?? ""}
+                      onChange={(e) => setDraftBalances(p => ({ ...p, [acc.id]: e.target.value }))}
+                      className="w-28 glass rounded-lg px-2.5 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-white">
+                      {latestByAccount[acc.id] != null ? EUR(latestByAccount[acc.id]) : <span className="text-zinc-600">—</span>}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
           ))}
         </div>
 
-        {/* Add account */}
         {editing && (
           <div className="mt-4">
             {!addingAccount ? (
-              <button onClick={() => setAddingAccount(true)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
-                + Add account
-              </button>
+              <button onClick={() => setAddingAccount(true)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">+ Add account</button>
             ) : (
-              <div className="bg-zinc-800 rounded-xl p-3 space-y-2 mt-2">
-                <input
-                  type="text"
-                  placeholder="Account name"
-                  value={newAccount.name}
-                  onChange={(e) => setNewAccount((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full bg-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-                />
+              <div className="glass rounded-xl p-3 space-y-2 mt-2">
+                <input type="text" placeholder="Account name" value={newAccount.name} onChange={e => setNewAccount(p => ({ ...p, name: e.target.value }))} className="w-full glass rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
                 <div className="flex gap-2">
-                  <select
-                    value={newAccount.type}
-                    onChange={(e) => setNewAccount((p) => ({ ...p, type: e.target.value }))}
-                    className="flex-1 bg-zinc-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none"
-                  >
+                  <select value={newAccount.type} onChange={e => setNewAccount(p => ({ ...p, type: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none">
                     <option value="current">Current</option>
                     <option value="savings">Savings</option>
                     <option value="investment">Investment</option>
                     <option value="pension">Pension</option>
                   </select>
-                  <select
-                    value={newAccount.currency}
-                    onChange={(e) => setNewAccount((p) => ({ ...p, currency: e.target.value }))}
-                    className="w-20 bg-zinc-700 rounded-lg px-2 py-2 text-sm text-white focus:outline-none"
-                  >
-                    <option>EUR</option>
-                    <option>GBP</option>
-                    <option>USD</option>
+                  <select value={newAccount.currency} onChange={e => setNewAccount(p => ({ ...p, currency: e.target.value }))} className="w-20 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none">
+                    <option>EUR</option><option>GBP</option><option>USD</option>
                   </select>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setAddingAccount(false)} className="flex-1 py-1.5 text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
-                  <button onClick={addAccount} className="flex-1 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Add</button>
+                  <button onClick={() => setAddingAccount(false)} className="flex-1 py-1.5 text-xs text-zinc-500">Cancel</button>
+                  <button onClick={addAccount} className="flex-1 py-1.5 text-xs rounded-lg text-indigo-300" style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)" }}>Add</button>
                 </div>
               </div>
             )}
           </div>
         )}
-      </div>
 
-      {!hasHistory && (
-        <p className="text-xs text-zinc-600 text-center">Save your first snapshot to start tracking net worth over time.</p>
-      )}
+        {!hasHistory && !editing && (
+          <p className="text-[10px] text-zinc-600 text-center mt-3">Save your first snapshot to start tracking net worth over time.</p>
+        )}
+      </GlassCard>
     </div>
   );
 }

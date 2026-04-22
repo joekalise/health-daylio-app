@@ -72,5 +72,6 @@ export const userProfile = pgTable("user_profile", {
   fitnessGoals: text("fitness_goals"),
   financialGoals: text("financial_goals"),
   about: text("about"),
+  photo: text("photo"), // base64 data URL
   updatedAt: timestamp("updated_at").defaultNow(),
 });
