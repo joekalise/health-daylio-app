@@ -99,19 +99,19 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
       </div>
 
       {/* Activities */}
-      <div className="space-y-3">
+      <div className="space-y-4 text-left">
         {ACTIVITY_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-xs text-zinc-500 mb-1.5">{group.label}</p>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="text-sm font-medium text-zinc-300 mb-2">{group.label}</p>
+            <div className="flex flex-wrap gap-2">
               {group.items.map((a) => (
                 <button
                   key={a}
                   onClick={() => toggle(a)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     activities.includes(a)
                       ? "bg-indigo-600 text-white"
-                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
                   }`}
                 >
                   {a}
