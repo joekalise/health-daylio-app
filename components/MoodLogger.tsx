@@ -76,23 +76,23 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-center">
       {/* Mood selector */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 justify-center">
         {MOODS.map((m) => (
           <button
             key={m}
             onClick={() => setMood(m)}
-            className={`flex-1 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all duration-150 ${
+            className={`flex-1 py-5 rounded-2xl flex flex-col items-center gap-2 transition-all duration-150 ${
               mood === m
                 ? "ring-2 ring-white/30 scale-105"
-                : "opacity-50 hover:opacity-80 hover:scale-102"
+                : "opacity-50 hover:opacity-80"
             }`}
             style={{
               backgroundColor: MOOD_COLORS[m] + (mood === m ? "33" : "1a"),
             }}
           >
-            <span className="text-2xl">{MOOD_EMOJI[m]}</span>
+            <span className="text-4xl">{MOOD_EMOJI[m]}</span>
             <span className="text-xs text-zinc-300 font-medium">{m}</span>
           </button>
         ))}

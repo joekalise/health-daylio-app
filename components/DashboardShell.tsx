@@ -7,7 +7,7 @@ import ActivityHeatmap from "./ActivityHeatmap";
 import HealthSection from "./HealthSection";
 import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
-import ProfileSection from "./ProfileSection";
+import SettingsPanel from "./SettingsPanel";
 import ChatPanel from "./ChatPanel";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays } from "date-fns";
@@ -247,17 +247,14 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           </section>
         )}
 
-        {/* PROFILE TAB */}
+        {/* SETTINGS TAB */}
         {tab === "Profile" && (
           <section className="glass rounded-2xl p-4">
             <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="font-semibold">Profile</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">Personalises the AI chatbot</p>
-              </div>
+              <h2 className="font-semibold">Settings</h2>
               <a href="/api/auth/signout" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">Sign out</a>
             </div>
-            <ProfileSection onPhotoChange={(photo) => setProfile(p => ({ ...p, photo }))} />
+            <SettingsPanel onPhotoChange={(photo) => setProfile(p => ({ ...p, photo }))} />
           </section>
         )}
       </main>

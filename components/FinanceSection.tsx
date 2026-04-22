@@ -70,6 +70,18 @@ export default function FinanceSection() {
   const [addingAccount, setAddingAccount] = useState(false);
   const [newAccount, setNewAccount] = useState({ name: "", type: "current", currency: "EUR" });
   const [loading, setLoading] = useState(true);
+  const [fireSettings, setFireSettings] = useState({ multiplier: 25, annualReturn: 7, retireAge: null as number | null });
+
+  useEffect(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("fire_settings") ?? "{}");
+      setFireSettings({
+        multiplier: s.multiplier ?? 25,
+        annualReturn: s.annualReturn ?? 7,
+        retireAge: s.retireAge ?? null,
+      });
+    } catch {}
+  }, []);
 
   async function load() {
     const [b, f] = await Promise.all([
@@ -151,10 +163,10 @@ export default function FinanceSection() {
 
   // FIRE
   const annualExpenses = monthlyExpenses * 12;
-  const fireTarget = annualExpenses * 25;
+  const fireTarget = annualExpenses * fireSettings.multiplier;
   const currentInvested = (byType.investment ?? 0) + (byType.pension ?? 0);
   const monthlyInvestment = Math.max(0, monthlySavingsAllocated);
-  const yearsLeft = yearsToFIRE(currentInvested, monthlyInvestment, fireTarget);
+  const yearsLeft = yearsToFIRE(currentInvested, monthlyInvestment, fireTarget, fireSettings.annualReturn / 100);
   const firePct = fireTarget > 0 ? Math.min((currentInvested / fireTarget) * 100, 100) : 0;
 
   // Budget breakdown bar data
@@ -289,7 +301,9 @@ export default function FinanceSection() {
             {yearsLeft !== null && (
               <div className="text-right">
                 <span className="text-lg font-bold text-violet-300">{yearsLeft}y</span>
-                <p className="text-[10px] text-zinc-600">to go</p>
+                <p className="text-[10px] text-zinc-600">
+                  {fireSettings.retireAge ? `retire at ${fireSettings.retireAge}` : "to go"}
+                </p>
               </div>
             )}
           </div>

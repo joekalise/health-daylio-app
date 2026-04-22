@@ -249,7 +249,9 @@ export default function HealthSection({ days }: { days: number }) {
         </div>
       )}
 
-      <ManualEntry onSaved={reload} />
+      <div className="mt-4 pt-4 border-t border-white/5 text-center">
+        <p className="text-[10px] text-zinc-600">Missing data? Add metrics in <span className="text-indigo-400">Settings → Uploads</span></p>
+      </div>
     </div>
   );
 }
