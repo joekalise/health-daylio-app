@@ -81,11 +81,11 @@ export async function GET() {
   }));
 
   // Finance
-  let budgetEntries: { name: string; value: number; type: string | null }[] = [];
+  let budgetEntries: { name: string; value: number; category: string; type: string | null }[] = [];
   let netWorthLatest: number | null = null;
   if (snapshot.length) {
     const entries = await db.select().from(financeEntries).where(eq(financeEntries.snapshotId, snapshot[0].id));
-    budgetEntries = entries.map(e => ({ name: e.name, value: e.value, type: (e.metadata as { type?: string } | null)?.type ?? null }));
+    budgetEntries = entries.map(e => ({ name: e.name, value: e.value, category: e.category, type: (e.metadata as { type?: string } | null)?.type ?? null }));
     const balances = await db.select().from(financeBalances).orderBy(desc(financeBalances.date));
     const netWorthIds = new Set(accounts.filter(a => a.isNetWorth).map(a => a.id));
     const latestByAccount: Record<number, number> = {};
@@ -93,9 +93,9 @@ export async function GET() {
     netWorthLatest = Object.entries(latestByAccount).filter(([id]) => netWorthIds.has(Number(id))).reduce((s, [, v]) => s + v, 0);
   }
 
-  const income = budgetEntries.filter(e => e.type === "I" || e.name.toLowerCase().includes("salary") || e.name.toLowerCase().includes("income")).reduce((s, e) => s + e.value, 0);
-  const savings = budgetEntries.filter(e => e.type === "S").reduce((s, e) => s + e.value, 0);
-  const expenses = budgetEntries.filter(e => !["I", "S"].includes(e.type ?? "")).reduce((s, e) => s + e.value, 0);
+  const income = budgetEntries.filter(e => e.category === "income").reduce((s, e) => s + e.value, 0);
+  const savings = budgetEntries.filter(e => e.category === "expense" && e.type === "S").reduce((s, e) => s + e.value, 0);
+  const expenses = budgetEntries.filter(e => e.category === "expense" && e.type !== "S").reduce((s, e) => s + e.value, 0);
 
   const context = {
     today: todayS,

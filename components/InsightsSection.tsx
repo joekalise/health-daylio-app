@@ -106,15 +106,30 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
     setError(null);
     try {
       const r = await fetch("/api/insights");
-      if (!r.ok) throw new Error("Failed");
-      setAiData(await r.json());
-    } catch {
-      setError("Couldn't load insights. Tap refresh to try again.");
+      if (!r.ok) throw new Error(`${r.status}`);
+      const data = await r.json();
+      setAiData(data);
+      try { sessionStorage.setItem("insights_cache", JSON.stringify(data)); } catch {}
+    } catch (e) {
+      // Keep last cached result if available
+      try {
+        const cached = sessionStorage.getItem("insights_cache");
+        if (cached) { setAiData(JSON.parse(cached)); setError("Showing cached result — tap refresh to retry."); }
+        else setError("Couldn't load insights. Tap refresh to try again.");
+      } catch { setError("Couldn't load insights. Tap refresh to try again."); }
     }
     setLoading(false);
   }
 
-  useEffect(() => { loadInsights(); }, []);
+  useEffect(() => {
+    // Load from cache immediately while fetching
+    try {
+      const cached = sessionStorage.getItem("insights_cache");
+      if (cached) setAiData(JSON.parse(cached));
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadInsights(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (entries.length < 7) return <p className="text-sm" style={{ color: "var(--text-dim)" }}>Not enough data yet.</p>;
 
