@@ -220,9 +220,8 @@ export async function POST(req: NextRequest) {
         // Agentic loop — Claude may call tools multiple times
         while (true) {
           const response = await client.messages.create({
-            model: "claude-opus-4-7",
-            max_tokens: 4096,
-            thinking: { type: "adaptive" },
+            model: "claude-sonnet-4-6",
+            max_tokens: 2048,
             system,
             tools: TOOLS,
             messages: apiMessages,
