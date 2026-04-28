@@ -5,8 +5,35 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek } from "date-fns";
 import { useChartTheme } from "@/lib/chartTheme";
+
+function smooth(data: { date: string; value: number }[], days: number) {
+  if (days <= 60 || data.length <= 60) return data;
+  const weeks: Record<string, { total: number; count: number }> = {};
+  for (const d of data) {
+    const key = startOfWeek(parseISO(d.date), { weekStartsOn: 1 }).toISOString().split("T")[0];
+    if (!weeks[key]) weeks[key] = { total: 0, count: 0 };
+    weeks[key].total += d.value;
+    weeks[key].count++;
+  }
+  return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([date, { total, count }]) => ({ date, value: total / count }));
+}
+
+function smoothSleep(data: { date: string; deep: number; rem: number; core: number }[], days: number) {
+  if (days <= 60 || data.length <= 60) return data;
+  const weeks: Record<string, { deep: number; rem: number; core: number; count: number }> = {};
+  for (const d of data) {
+    const key = startOfWeek(parseISO(d.date), { weekStartsOn: 1 }).toISOString().split("T")[0];
+    if (!weeks[key]) weeks[key] = { deep: 0, rem: 0, core: 0, count: 0 };
+    weeks[key].deep += d.deep; weeks[key].rem += d.rem; weeks[key].core += d.core; weeks[key].count++;
+  }
+  return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, deep: v.deep / v.count, rem: v.rem / v.count, core: v.core / v.count }));
+}
+
+function dateFormat(days: number) {
+  return days <= 60 ? "MMM d" : days <= 365 ? "MMM" : "MMM yy";
+}
 
 interface Metric {
   id: number;
@@ -28,26 +55,29 @@ function avg(rows: Metric[]) {
   return rows.reduce((s, r) => s + r.value, 0) / rows.length;
 }
 
-function MiniChart({ data, color, unit, formatter, gradientId }: {
+function MiniChart({ data, color, unit, formatter, gradientId, days }: {
   data: { date: string; value: number }[];
   color: string;
   unit: string;
   formatter?: (v: number) => string;
   gradientId: string;
+  days: number;
 }) {
   const theme = useChartTheme();
   if (!data.length) return <p className="text-xs" style={{ color: "var(--text-muted)" }}>No data</p>;
+  const chartData = smooth(data, days);
+  const fmt = dateFormat(days);
   return (
-    <ResponsiveContainer width="100%" height={120}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+    <ResponsiveContainer width="100%" height={140}>
+      <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
-        <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM d")} tick={theme.tick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+        <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), fmt)} tick={theme.tick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={theme.tick} tickLine={false} axisLine={false} width={36} tickFormatter={formatter} />
         <Tooltip
           contentStyle={theme.tooltip}
@@ -60,25 +90,22 @@ function MiniChart({ data, color, unit, formatter, gradientId }: {
   );
 }
 
-function SleepBar({ data }: { data: Metric[] }) {
+function SleepBar({ data, days }: { data: Metric[]; days: number }) {
   const theme = useChartTheme();
-  const chartData = data
+  const raw = data
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((r) => ({
-      date: r.date,
-      total: r.value,
-      deep: (r.metadata?.deep ?? 0),
-      rem: (r.metadata?.rem ?? 0),
-      core: (r.metadata?.core ?? 0),
-    }));
+    .map((r) => ({ date: r.date, deep: r.metadata?.deep ?? 0, rem: r.metadata?.rem ?? 0, core: r.metadata?.core ?? 0 }));
 
-  if (!chartData.length) return <p className="text-xs" style={{ color: "var(--text-muted)" }}>No data</p>;
+  if (!raw.length) return <p className="text-xs" style={{ color: "var(--text-muted)" }}>No data</p>;
+  const chartData = smoothSleep(raw, days);
+  const fmt = dateFormat(days);
+  const barSize = days <= 30 ? 12 : days <= 90 ? 6 : 4;
 
   return (
-    <ResponsiveContainer width="100%" height={120}>
-      <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }} barSize={8}>
+    <ResponsiveContainer width="100%" height={140}>
+      <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }} barSize={barSize}>
         <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
-        <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM d")} tick={theme.tick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+        <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), fmt)} tick={theme.tick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={theme.tick} tickLine={false} axisLine={false} width={36} />
         <Tooltip
           contentStyle={theme.tooltip}
@@ -239,25 +266,25 @@ export default function HealthSection({ days }: { days: number }) {
       {/* Steps */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">Steps</h3>
-        <MiniChart data={steps} color="#10b981" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" />
+        <MiniChart data={steps} color="#10b981" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" days={days} />
       </div>
 
       {/* HRV */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">HRV</h3>
-        <MiniChart data={hrv} color="#6366f1" unit="ms" gradientId="hrv-grad" />
+        <MiniChart data={hrv} color="#6366f1" unit="ms" gradientId="hrv-grad" days={days} />
       </div>
 
       {/* Resting HR */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">Resting Heart Rate</h3>
-        <MiniChart data={restingHr} color="#ec4899" unit="bpm" gradientId="hr-grad" />
+        <MiniChart data={restingHr} color="#ec4899" unit="bpm" gradientId="hr-grad" days={days} />
       </div>
 
       {/* Sleep */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">Sleep · Deep / REM / Core</h3>
-        <SleepBar data={sleep} />
+        <SleepBar data={sleep} days={days} />
       </div>
 
       {/* Recent workouts */}
