@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { moodEntries, healthMetrics, userProfile } from "@/db/schema";
-import { gte, lte, and, desc, eq } from "drizzle-orm";
+import { moodEntries, healthMetrics, userProfile, financeBalances, financeAccounts, financeEntries, financeSnapshots } from "@/db/schema";
+import { gte, lte, and, desc, eq, asc } from "drizzle-orm";
 
 const client = new Anthropic();
 
@@ -42,6 +42,24 @@ const TOOLS: Anthropic.Tool[] = [
       properties: {
         min_count: { type: "number", description: "Minimum times activity must appear (default 3)" },
       },
+    },
+  },
+  {
+    name: "query_finance_balances",
+    description: "Get net worth history over time, current account balances, and a breakdown of each account (name, type, current amount). Use this for net worth, savings, investment, or account balance questions.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        months: { type: "number", description: "How many months of net worth history to return (default 12, max 60)" },
+      },
+    },
+  },
+  {
+    name: "query_finance_budget",
+    description: "Get the user's monthly budget: income, expenses, and savings/investment allocations. Returns each line item with name, category, value, and type (I=income, E=expense, S=savings).",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
     },
   },
 ];
@@ -99,6 +117,58 @@ async function runTool(name: string, input: Record<string, unknown>) {
     );
   }
 
+  if (name === "query_finance_balances") {
+    const months = Math.min(Number(input.months ?? 12), 60);
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - months);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+
+    const accounts = await db.select().from(financeAccounts).where(eq(financeAccounts.isActive, true)).orderBy(asc(financeAccounts.displayOrder));
+    const balances = await db.select().from(financeBalances).where(gte(financeBalances.date, cutoffStr)).orderBy(desc(financeBalances.date));
+
+    const netWorthIds = new Set(accounts.filter(a => a.isNetWorth).map(a => a.id));
+
+    // Latest balance per account
+    const latestByAccount: Record<number, number> = {};
+    for (const b of balances) {
+      if (!(b.accountId in latestByAccount)) latestByAccount[b.accountId] = b.amount;
+    }
+
+    // Net worth history by date
+    const byDate: Record<string, number> = {};
+    for (const b of balances) {
+      if (!netWorthIds.has(b.accountId)) continue;
+      byDate[b.date] = (byDate[b.date] ?? 0) + b.amount;
+    }
+    const history = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, netWorth]) => ({ date, netWorth }));
+
+    const accountSummary = accounts.map(a => ({
+      name: a.name,
+      type: a.type,
+      currency: a.currency,
+      isNetWorth: a.isNetWorth,
+      currentBalance: latestByAccount[a.id] ?? null,
+    }));
+
+    return JSON.stringify({ accounts: accountSummary, netWorthHistory: history });
+  }
+
+  if (name === "query_finance_budget") {
+    const [snapshot] = await db.select().from(financeSnapshots).orderBy(desc(financeSnapshots.importedAt)).limit(1);
+    if (!snapshot) return JSON.stringify({ entries: [] });
+
+    const entries = await db.select().from(financeEntries).where(eq(financeEntries.snapshotId, snapshot.id));
+    return JSON.stringify({
+      entries: entries.map(e => ({
+        name: e.name,
+        category: e.category,
+        value: e.value,
+        currency: e.currency,
+        type: (e.metadata as { type?: string } | null)?.type ?? null,
+      })),
+    });
+  }
+
   return "Unknown tool";
 }
 
@@ -121,13 +191,14 @@ async function buildSystem(): Promise<string> {
     if (parts.length) profileSection = `\n\nUser profile:\n${parts.join("\n")}`;
   }
 
-  return `You are a personal analytics assistant for a specific user's life dashboard. You have access to their Apple Health data, mood tracking history, and personal profile.
+  return `You are a personal analytics assistant for a specific user's life dashboard. You have access to their Apple Health data, mood tracking, and financial data.
 
 Available data:
 - Mood entries: daily mood (rad/good/meh/bad/awful), activities, notes — going back years
-- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, VO2 max, weight${profileSection}
+- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, weight
+- Finance: net worth history, account balances (Revolut, Emergency Fund, investments, pension, flat equity), monthly budget (income, expenses, savings allocations)${profileSection}
 
-Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Factor in the user's health conditions and goals when giving insights. Spot patterns (e.g. "your HRV is higher on days you log 'exercise'"). Today's date is ${today}.`;
+Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Factor in the user's health conditions and goals when giving insights. Spot patterns across all domains (e.g. mood vs exercise, savings rate trends, net worth growth). Today's date is ${today}.`;
 }
 
 export async function POST(req: NextRequest) {

@@ -8,10 +8,10 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  "What's my average mood this month?",
+  "What's my current net worth and how has it grown?",
+  "What's my savings rate and how am I tracking?",
   "Which activities correlate with my best moods?",
   "How has my HRV trended lately?",
-  "What was my best sleep week recently?",
   "Compare my mood on days I exercise vs don't",
 ];
 
