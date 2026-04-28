@@ -230,16 +230,16 @@ export default function HealthSection({ days }: { days: number }) {
 
       {/* Summary row */}
       <div className="grid grid-cols-4 gap-2">
-        <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="#22c55e" />
-        <StatCard label="Avg HRV" value={avg(hrv)?.toFixed(0) ?? null} unit="ms" color="#6366f1" />
-        <StatCard label="Resting HR" value={avg(restingHr)?.toFixed(0) ?? null} unit="bpm" color="#f97316" />
-        <StatCard label="Avg sleep" value={avg(sleep)?.toFixed(1) ?? null} unit="hr" color="#8b5cf6" />
+        <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="var(--c-positive)" />
+        <StatCard label="Avg HRV" value={avg(hrv)?.toFixed(0) ?? null} unit="ms" color="var(--c-primary)" />
+        <StatCard label="Resting HR" value={avg(restingHr)?.toFixed(0) ?? null} unit="bpm" color="var(--c-heart)" />
+        <StatCard label="Avg sleep" value={avg(sleep)?.toFixed(1) ?? null} unit="hr" color="var(--c-secondary)" />
       </div>
 
       {/* Steps */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">Steps</h3>
-        <MiniChart data={steps} color="#22c55e" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" />
+        <MiniChart data={steps} color="#10b981" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" />
       </div>
 
       {/* HRV */}
@@ -251,7 +251,7 @@ export default function HealthSection({ days }: { days: number }) {
       {/* Resting HR */}
       <div>
         <h3 className="text-xs font-medium text-zinc-400 mb-2">Resting Heart Rate</h3>
-        <MiniChart data={restingHr} color="#f97316" unit="bpm" gradientId="hr-grad" />
+        <MiniChart data={restingHr} color="#ec4899" unit="bpm" gradientId="hr-grad" />
       </div>
 
       {/* Sleep */}

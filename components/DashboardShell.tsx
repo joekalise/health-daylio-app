@@ -51,11 +51,11 @@ function RangePicker({ value, onChange }: { value: Range; onChange: (r: Range) =
         <button
           key={r}
           onClick={() => onChange(r)}
-          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-            value === r
-              ? "bg-indigo-500/30 text-indigo-300 border border-indigo-500/40"
-              : "text-zinc-500 hover:text-zinc-300"
-          }`}
+          className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+          style={value === r
+            ? { background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }
+            : { color: "var(--text-muted)" }
+          }
         >
           {RANGE_LABELS[r]}
         </button>
@@ -111,9 +111,9 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
   const recent = filteredEntries.slice(0, 10);
 
   return (
-    <div className="min-h-screen pb-28" style={{ color: "var(--text)" }}>
+    <div className="min-h-screen" style={{ color: "var(--text)", paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
       {/* Header */}
-      <header className="px-4 pt-8 pb-2 max-w-2xl mx-auto">
+      <header className="px-4 pb-2 max-w-2xl mx-auto" style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top, 0px))" }}>
         <div className="flex justify-between items-start">
           <div>
             <p className="text-zinc-500 text-xs tracking-wide uppercase">{format(new Date(), "EEEE, MMMM d")}</p>
@@ -254,7 +254,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
       </main>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ background: "var(--nav-bg)", borderTop: "1px solid var(--nav-border)", backdropFilter: "blur(20px)" }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ background: "var(--nav-bg)", borderTop: "1px solid var(--nav-border)", backdropFilter: "blur(20px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="flex max-w-2xl mx-auto">
           {TABS.map(({ id, emoji }) => (
             <button
@@ -263,12 +263,12 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               className="flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-all relative"
             >
               {tab === id && (
-                <span className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #6366f1, transparent)" }} />
+                <span className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--c-primary), transparent)" }} />
               )}
               <span className={`text-xl transition-all ${tab === id ? "scale-110" : "opacity-50"}`}>{emoji}</span>
-              <span className={`text-[10px] font-medium tracking-wide ${tab === id ? "text-indigo-500" : ""}`} style={tab !== id ? { color: "var(--text-muted)" } : {}}>{id}</span>
+              <span className="text-[10px] font-medium tracking-wide" style={{ color: tab === id ? "var(--c-primary)" : "var(--text-muted)" }}>{id}</span>
               {id === "Today" && !todayLogged && tab !== "Today" && (
-                <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full" style={{ background: "var(--c-primary)" }} />
               )}
             </button>
           ))}
