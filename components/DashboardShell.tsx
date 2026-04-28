@@ -111,7 +111,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
   const recent = filteredEntries.slice(0, 10);
 
   return (
-    <div className="min-h-screen text-white pb-28">
+    <div className="min-h-screen pb-28" style={{ color: "var(--text)" }}>
       {/* Header */}
       <header className="px-4 pt-8 pb-2 max-w-2xl mx-auto">
         <div className="flex justify-between items-start">
@@ -125,17 +125,17 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
         {/* Stats — only shown on mood-relevant tabs */}
         {(tab === "Today" || tab === "Mood") && (
           <div className="flex gap-2.5 mt-5">
-            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.25)" }}>
-              <div className="text-xl font-bold text-indigo-300">{entries.length.toLocaleString()}</div>
-              <div className="text-[10px] text-indigo-400/70 mt-0.5 uppercase tracking-wide">Days logged</div>
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-indigo)", border: "1px solid var(--stat-border-indigo)" }}>
+              <div className="text-xl font-bold text-indigo-500">{entries.length.toLocaleString()}</div>
+              <div className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>Days logged</div>
             </div>
-            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
-              <div className="text-xl font-bold text-violet-300">{avgScore}</div>
-              <div className="text-[10px] text-violet-400/70 mt-0.5 uppercase tracking-wide">Avg mood</div>
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-violet)", border: "1px solid var(--stat-border-violet)" }}>
+              <div className="text-xl font-bold text-violet-500">{avgScore}</div>
+              <div className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>Avg mood</div>
             </div>
-            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.25)" }}>
-              <div className="text-xl font-bold text-orange-300">{streak} 🔥</div>
-              <div className="text-[10px] text-orange-400/70 mt-0.5 uppercase tracking-wide">Day streak</div>
+            <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-orange)", border: "1px solid var(--stat-border-orange)" }}>
+              <div className="text-xl font-bold text-orange-500">{streak} 🔥</div>
+              <div className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>Day streak</div>
             </div>
           </div>
         )}
@@ -206,12 +206,6 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               </div>
             </section>
 
-            <section className="glass rounded-2xl p-4">
-              <h2 className="font-semibold mb-3">Import data</h2>
-              <a href="/import" className="block w-full text-center py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-sm text-zinc-300 transition-colors border border-white/8">
-                Import Daylio CSV
-              </a>
-            </section>
           </>
         )}
 
@@ -260,7 +254,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
       </main>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ background: "rgba(7,7,15,0.85)", borderTop: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(20px)" }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ background: "var(--nav-bg)", borderTop: "1px solid var(--nav-border)", backdropFilter: "blur(20px)" }}>
         <div className="flex max-w-2xl mx-auto">
           {TABS.map(({ id, emoji }) => (
             <button
@@ -272,7 +266,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                 <span className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #6366f1, transparent)" }} />
               )}
               <span className={`text-xl transition-all ${tab === id ? "scale-110" : "opacity-50"}`}>{emoji}</span>
-              <span className={`text-[10px] font-medium tracking-wide ${tab === id ? "text-indigo-400" : "text-zinc-600"}`}>{id}</span>
+              <span className={`text-[10px] font-medium tracking-wide ${tab === id ? "text-indigo-500" : ""}`} style={tab !== id ? { color: "var(--text-muted)" } : {}}>{id}</span>
               {id === "Today" && !todayLogged && tab !== "Today" && (
                 <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-indigo-400" />
               )}
