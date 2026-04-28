@@ -9,7 +9,7 @@ import { format, parseISO, startOfWeek } from "date-fns";
 import { useChartTheme } from "@/lib/chartTheme";
 
 function smooth(data: { date: string; value: number }[], days: number) {
-  if (days <= 60 || data.length <= 60) return data;
+  if (days <= 60) return data;
   const weeks: Record<string, { total: number; count: number }> = {};
   for (const d of data) {
     const key = startOfWeek(parseISO(d.date), { weekStartsOn: 1 }).toISOString().split("T")[0];
@@ -21,7 +21,7 @@ function smooth(data: { date: string; value: number }[], days: number) {
 }
 
 function smoothSleep(data: { date: string; deep: number; rem: number; core: number }[], days: number) {
-  if (days <= 60 || data.length <= 60) return data;
+  if (days <= 60) return data;
   const weeks: Record<string, { deep: number; rem: number; core: number; count: number }> = {};
   for (const d of data) {
     const key = startOfWeek(parseISO(d.date), { weekStartsOn: 1 }).toISOString().split("T")[0];

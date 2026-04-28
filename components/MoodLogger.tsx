@@ -70,7 +70,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
     return (
       <div className="py-8 text-center space-y-2">
         <div className="text-5xl">{MOOD_EMOJI[mood]}</div>
-        <p className="text-zinc-300 font-medium">Logged!</p>
+        <p className="font-medium" style={{ color: "var(--text-dim)" }}>Logged!</p>
       </div>
     );
   }
@@ -84,16 +84,12 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
             key={m}
             onClick={() => setMood(m)}
             className={`flex-1 py-5 rounded-2xl flex flex-col items-center gap-2 transition-all duration-150 ${
-              mood === m
-                ? "ring-2 ring-white/30 scale-105"
-                : "opacity-50 hover:opacity-80"
+              mood === m ? "ring-2 ring-white/30 scale-105" : "opacity-50 hover:opacity-80"
             }`}
-            style={{
-              backgroundColor: MOOD_COLORS[m] + (mood === m ? "33" : "1a"),
-            }}
+            style={{ backgroundColor: MOOD_COLORS[m] + (mood === m ? "33" : "1a") }}
           >
             <span className="text-4xl">{MOOD_EMOJI[m]}</span>
-            <span className="text-xs text-zinc-300 font-medium">{m}</span>
+            <span className="text-xs font-medium" style={{ color: "var(--text-dim)" }}>{m}</span>
           </button>
         ))}
       </div>
@@ -102,17 +98,17 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
       <div className="space-y-4">
         {ACTIVITY_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-sm font-medium text-zinc-300 mb-2 text-center">{group.label}</p>
+            <p className="text-sm font-medium mb-2 text-center" style={{ color: "var(--text-dim)" }}>{group.label}</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {group.items.map((a) => (
                 <button
                   key={a}
                   onClick={() => toggle(a)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    activities.includes(a)
-                      ? "bg-indigo-600 text-white"
-                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
-                  }`}
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-all"
+                  style={activities.includes(a)
+                    ? { background: "var(--c-primary)", color: "#fff" }
+                    : { background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text-dim)" }
+                  }
                 >
                   {a}
                 </button>
@@ -128,7 +124,12 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
         onChange={(e) => setNote(e.target.value)}
         placeholder="Anything to note? (optional)"
         rows={2}
-        className="w-full bg-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 border border-zinc-700/50 focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+        className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none transition-colors"
+        style={{
+          background: "var(--input-bg)",
+          border: "1px solid var(--chip-border)",
+          color: "var(--text)",
+        }}
       />
 
       <button
@@ -138,6 +139,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
         style={{
           backgroundColor: mood ? MOOD_COLORS[mood] : "#4f46e5",
           opacity: (!mood || saving) ? 0.3 : 1,
+          color: "#fff",
         }}
       >
         {saving ? "Saving..." : mood ? `Log ${MOOD_EMOJI[mood]} ${mood}` : "Pick a mood to log"}

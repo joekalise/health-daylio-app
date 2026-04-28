@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip,
-  CartesianGrid, PieChart, Pie, Cell, BarChart, Bar,
+  ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
+  CartesianGrid, PieChart, Pie, Cell,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek } from "date-fns";
+import { useChartTheme } from "@/lib/chartTheme";
 
 interface Account { id: number; name: string; type: string; currency: string; displayOrder: number; isNetWorth: boolean; }
 interface BudgetEntry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
@@ -14,9 +15,6 @@ interface BalanceData {
   latestByAccount: Record<number, number>;
   history: { date: string; netWorth: number }[];
 }
-
-const tooltipStyle = { backgroundColor: "#07070f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12 };
-const tickStyle = { fill: "#52525b", fontSize: 11 };
 
 const TYPE_COLORS: Record<string, string> = {
   current: "#6366f1", savings: "#22c55e", investment: "#f97316", pension: "#8b5cf6",
@@ -55,13 +53,26 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
   return (
     <div className="rounded-2xl p-3 text-center" style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
       <div className="text-xs mb-0.5" style={{ color: `${color}99` }}>{label}</div>
-      <div className="font-bold text-base text-white">{value}</div>
+      <div className="font-bold text-base" style={{ color: "var(--text)" }}>{value}</div>
       {sub && <div className="text-[10px] mt-0.5" style={{ color: `${color}70` }}>{sub}</div>}
     </div>
   );
 }
 
+function smoothNetWorth(data: { date: string; netWorth: number }[]) {
+  if (data.length <= 10) return data;
+  const weeks: Record<string, { total: number; count: number }> = {};
+  for (const d of data) {
+    const key = startOfWeek(parseISO(d.date), { weekStartsOn: 1 }).toISOString().split("T")[0];
+    if (!weeks[key]) weeks[key] = { total: 0, count: 0 };
+    weeks[key].total += d.netWorth;
+    weeks[key].count++;
+  }
+  return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([date, { total, count }]) => ({ date, netWorth: total / count }));
+}
+
 export default function FinanceSection() {
+  const theme = useChartTheme();
   const [balData, setBalData] = useState<BalanceData | null>(null);
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([]);
   const [editing, setEditing] = useState(false);
@@ -132,7 +143,7 @@ export default function FinanceSection() {
     await load();
   }
 
-  if (loading) return <p className="text-zinc-500 text-sm text-center py-12">Loading...</p>;
+  if (loading) return <p className="text-sm text-center py-12" style={{ color: "var(--text-muted)" }}>Loading...</p>;
   if (!balData) return null;
 
   const { accounts, latestByAccount, history } = balData;
@@ -189,7 +200,7 @@ export default function FinanceSection() {
     <div className="space-y-4">
       {/* Net worth hero */}
       <GlassCard className="text-center py-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Net Worth</p>
+        <p className="text-xs uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>Net Worth</p>
         <p className="text-4xl font-bold grad-text">{EUR(netWorth)}</p>
         {hasHistory && (() => {
           const prev = history[history.length - 2]?.netWorth ?? 0;
@@ -203,7 +214,7 @@ export default function FinanceSection() {
         <div className="grid grid-cols-4 gap-2 mt-4">
           {Object.entries(TYPE_LABELS).filter(([t]) => byType[t] !== undefined).map(([type, label]) => (
             <div key={type} className="rounded-xl p-2 text-center" style={{ background: `${TYPE_COLORS[type]}15`, border: `1px solid ${TYPE_COLORS[type]}25` }}>
-              <div className="text-xs font-medium text-white">{EUR(byType[type] ?? 0)}</div>
+              <div className="text-xs font-medium" style={{ color: "var(--text)" }}>{EUR(byType[type] ?? 0)}</div>
               <div className="text-[10px] mt-0.5" style={{ color: `${TYPE_COLORS[type]}99` }}>{label}</div>
             </div>
           ))}
@@ -213,15 +224,21 @@ export default function FinanceSection() {
       {/* Net worth history */}
       {hasHistory && (
         <GlassCard>
-          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Net Worth History</h3>
-          <ResponsiveContainer width="100%" height={120}>
-            <LineChart data={history} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), "MMM yy")} tick={tickStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(d) => format(parseISO(d as string), "MMM d, yyyy")} formatter={(v) => [EUR(Number(v)), "Net Worth"]} />
-              <Line type="monotone" dataKey="netWorth" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: "#22c55e" }} />
-            </LineChart>
+          <h3 className="text-xs font-medium mb-3 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Net Worth History</h3>
+          <ResponsiveContainer width="100%" height={140}>
+            <AreaChart data={smoothNetWorth(history)} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+              <defs>
+                <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
+              <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), history.length > 180 ? "MMM yy" : "MMM")} tick={theme.tick} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={theme.tick} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={theme.tooltip} labelFormatter={(d) => format(parseISO(d as string), "MMM d, yyyy")} formatter={(v) => [EUR(Number(v)), "Net Worth"]} />
+              <Area type="monotone" dataKey="netWorth" stroke="#22c55e" strokeWidth={2.5} fill="url(#nwGrad)" dot={false} activeDot={{ r: 3, strokeWidth: 0 }} />
+            </AreaChart>
           </ResponsiveContainer>
         </GlassCard>
       )}
@@ -229,7 +246,7 @@ export default function FinanceSection() {
       {/* Budget overview */}
       {monthlyIncome > 0 && (
         <GlassCard>
-          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Monthly Budget</h3>
+          <h3 className="text-xs font-medium mb-3 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Monthly Budget</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             <StatCard label="Income" value={EUR(monthlyIncome)} color="#22c55e" />
             <StatCard label="Expenses" value={EUR(monthlyExpenses)} color="#f97316" />
@@ -239,24 +256,24 @@ export default function FinanceSection() {
           {/* Savings rate */}
           <div>
             <div className="flex justify-between text-xs mb-1.5">
-              <span className="text-zinc-500">Savings rate</span>
-              <span className="text-white font-medium">{pct(savingsRate)}</span>
+              <span style={{ color: "var(--text-muted)" }}>Savings rate</span>
+              <span className="font-medium" style={{ color: "var(--text)" }}>{pct(savingsRate)}</span>
             </div>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--divider)" }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(savingsRate, 100))}%`, background: "linear-gradient(90deg, #8b5cf6, #6366f1)" }} />
             </div>
-            <p className="text-[10px] text-zinc-600 mt-1">
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
               {savingsRate >= 30 ? "Excellent savings rate!" : savingsRate >= 20 ? "Great savings rate!" : savingsRate >= 10 ? "Good — aim for 20%+" : "Try to save more each month"}
             </p>
           </div>
           {/* Savings breakdown */}
           {savingsItems.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-2">Savings breakdown</p>
+            <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--divider)" }}>
+              <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Savings breakdown</p>
               {savingsItems.map(e => (
                 <div key={e.id} className="flex justify-between text-xs py-1">
-                  <span className="text-zinc-400">{e.name}</span>
-                  <span className="text-zinc-300">{EUR(e.value)}</span>
+                  <span style={{ color: "var(--text-dim)" }}>{e.name}</span>
+                  <span style={{ color: "var(--text)" }}>{EUR(e.value)}</span>
                 </div>
               ))}
             </div>
@@ -267,22 +284,22 @@ export default function FinanceSection() {
       {/* Expense breakdown */}
       {pieData.length > 0 && (
         <GlassCard>
-          <h3 className="text-xs font-medium text-zinc-400 mb-3 uppercase tracking-wide">Expense Breakdown</h3>
+          <h3 className="text-xs font-medium mb-3 uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Expense Breakdown</h3>
           <div className="flex gap-4 items-center">
             <ResponsiveContainer width={110} height={110}>
               <PieChart>
                 <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={28} outerRadius={50} strokeWidth={0}>
                   {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [EUR(Number(v)), ""]} />
+                <Tooltip contentStyle={theme.tooltip} formatter={(v) => [EUR(Number(v)), ""]} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 space-y-1.5 min-w-0">
               {pieData.slice(0, 6).map(({ name, value }, i) => (
                 <div key={name} className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="text-xs text-zinc-300 truncate flex-1">{name}</span>
-                  <span className="text-xs text-zinc-500">{EUR(value)}</span>
+                  <span className="text-xs truncate flex-1" style={{ color: "var(--text-dim)" }}>{name}</span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{EUR(value)}</span>
                 </div>
               ))}
             </div>
@@ -295,8 +312,8 @@ export default function FinanceSection() {
         <GlassCard>
           <div className="flex justify-between items-start mb-3">
             <div>
-              <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">FIRE Progress</h3>
-              <p className="text-[10px] text-zinc-600 mt-0.5">Financial Independence / Retire Early</p>
+              <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>FIRE Progress</h3>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>Financial Independence / Retire Early</p>
             </div>
             {yearsLeft !== null && (
               <div className="text-right">
@@ -309,14 +326,14 @@ export default function FinanceSection() {
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-zinc-500">Current invested</span>
-              <span className="text-white">{EUR(currentInvested)}</span>
+              <span style={{ color: "var(--text-muted)" }}>Current invested</span>
+              <span style={{ color: "var(--text)" }}>{EUR(currentInvested)}</span>
             </div>
             <div className="flex justify-between text-xs mb-2">
-              <span className="text-zinc-500">FIRE target (25× expenses)</span>
-              <span className="text-white">{EUR(fireTarget)}</span>
+              <span style={{ color: "var(--text-muted)" }}>FIRE target (25× expenses)</span>
+              <span style={{ color: "var(--text)" }}>{EUR(fireTarget)}</span>
             </div>
-            <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-3 rounded-full overflow-hidden" style={{ background: "var(--divider)" }}>
               <div
                 className="h-full rounded-full transition-all relative overflow-hidden"
                 style={{ width: `${firePct}%`, background: "linear-gradient(90deg, #8b5cf6, #6366f1)" }}
@@ -324,7 +341,7 @@ export default function FinanceSection() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
               </div>
             </div>
-            <div className="flex justify-between text-[10px] text-zinc-600">
+            <div className="flex justify-between text-[10px]" style={{ color: "var(--text-muted)" }}>
               <span>{pct(firePct)} there</span>
               <span>{EUR(fireTarget - currentInvested)} remaining</span>
             </div>
@@ -343,10 +360,10 @@ export default function FinanceSection() {
               <div className="mt-3">
                 <ResponsiveContainer width="100%" height={80}>
                   <LineChart data={projData} margin={{ top: 2, right: 4, bottom: 0, left: -10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="year" tick={tickStyle} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}y`} />
-                    <YAxis tick={tickStyle} tickLine={false} axisLine={false} width={45} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => [EUR(Number(v)), "Balance"]} labelFormatter={(v) => `Year ${v}`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
+                    <XAxis dataKey="year" tick={theme.tick} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}y`} />
+                    <YAxis tick={theme.tick} tickLine={false} axisLine={false} width={45} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+                    <Tooltip contentStyle={theme.tooltip} formatter={(v) => [EUR(Number(v)), "Balance"]} labelFormatter={(v) => `Year ${v}`} />
                     <Line type="monotone" dataKey="balance" stroke="#8b5cf6" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -359,12 +376,12 @@ export default function FinanceSection() {
       {/* Account balances */}
       <GlassCard>
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Account Balances</h3>
+          <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Account Balances</h3>
           {!editing ? (
             <button onClick={startEditing} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Update</button>
           ) : (
             <div className="flex gap-3">
-              <button onClick={() => setEditing(false)} className="text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
+              <button onClick={() => setEditing(false)} className="text-xs" style={{ color: "var(--text-muted)" }}>Cancel</button>
               <button onClick={saveSnapshot} disabled={saving} className="text-xs bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 px-3 py-1 rounded-lg transition-colors disabled:opacity-50">
                 {saving ? "Saving..." : "Save snapshot"}
               </button>
@@ -380,23 +397,24 @@ export default function FinanceSection() {
                 {TYPE_LABELS[type]}
               </p>
               {grouped[type].map((acc) => (
-                <div key={acc.id} className={`flex items-center justify-between py-2 border-b border-white/5 last:border-0 ${!acc.isNetWorth ? "opacity-50" : ""}`}>
+                <div key={acc.id} className={`flex items-center justify-between py-2 last:border-0 ${!acc.isNetWorth ? "opacity-50" : ""}`} style={{ borderBottom: "1px solid var(--divider)" }}>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm text-zinc-300 truncate">{acc.name}</span>
-                    {!acc.isNetWorth && <span className="text-[10px] text-zinc-600 flex-shrink-0">excl.</span>}
+                    <span className="text-sm truncate" style={{ color: "var(--text-dim)" }}>{acc.name}</span>
+                    {!acc.isNetWorth && <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-muted)" }}>excl.</span>}
                   </div>
                   {editing ? (
                     <input
                       type="number"
                       value={draftBalances[acc.id] ?? ""}
                       onChange={(e) => setDraftBalances(p => ({ ...p, [acc.id]: e.target.value }))}
-                      className="w-28 glass rounded-lg px-2.5 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500 flex-shrink-0"
+                      className="w-28 glass rounded-lg px-2.5 py-1 text-sm text-right focus:outline-none flex-shrink-0"
+                      style={{ color: "var(--text)" }}
                       placeholder="0.00"
                       step="0.01"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-white flex-shrink-0">
-                      {latestByAccount[acc.id] != null ? EUR(latestByAccount[acc.id]) : <span className="text-zinc-600">—</span>}
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: "var(--text)" }}>
+                      {latestByAccount[acc.id] != null ? EUR(latestByAccount[acc.id]) : <span style={{ color: "var(--text-muted)" }}>—</span>}
                     </span>
                   )}
                 </div>
@@ -408,23 +426,23 @@ export default function FinanceSection() {
         {editing && (
           <div className="mt-4">
             {!addingAccount ? (
-              <button onClick={() => setAddingAccount(true)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">+ Add account</button>
+              <button onClick={() => setAddingAccount(true)} className="text-xs transition-colors" style={{ color: "var(--text-muted)" }}>+ Add account</button>
             ) : (
               <div className="glass rounded-xl p-3 space-y-2 mt-2">
-                <input type="text" placeholder="Account name" value={newAccount.name} onChange={e => setNewAccount(p => ({ ...p, name: e.target.value }))} className="w-full glass rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                <input type="text" placeholder="Account name" value={newAccount.name} onChange={e => setNewAccount(p => ({ ...p, name: e.target.value }))} className="w-full glass rounded-lg px-3 py-2 text-sm focus:outline-none" style={{ color: "var(--text)" }} />
                 <div className="flex gap-2">
-                  <select value={newAccount.type} onChange={e => setNewAccount(p => ({ ...p, type: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none">
+                  <select value={newAccount.type} onChange={e => setNewAccount(p => ({ ...p, type: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm focus:outline-none" style={{ color: "var(--text)" }}>
                     <option value="current">Current</option>
                     <option value="savings">Savings</option>
                     <option value="investment">Investment</option>
                     <option value="pension">Pension</option>
                   </select>
-                  <select value={newAccount.currency} onChange={e => setNewAccount(p => ({ ...p, currency: e.target.value }))} className="w-20 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none">
+                  <select value={newAccount.currency} onChange={e => setNewAccount(p => ({ ...p, currency: e.target.value }))} className="w-20 glass rounded-lg px-2 py-2 text-sm focus:outline-none" style={{ color: "var(--text)" }}>
                     <option>EUR</option><option>GBP</option><option>USD</option>
                   </select>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setAddingAccount(false)} className="flex-1 py-1.5 text-xs text-zinc-500">Cancel</button>
+                  <button onClick={() => setAddingAccount(false)} className="flex-1 py-1.5 text-xs" style={{ color: "var(--text-muted)" }}>Cancel</button>
                   <button onClick={addAccount} className="flex-1 py-1.5 text-xs rounded-lg text-indigo-300" style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)" }}>Add</button>
                 </div>
               </div>
@@ -433,7 +451,7 @@ export default function FinanceSection() {
         )}
 
         {!hasHistory && !editing && (
-          <p className="text-[10px] text-zinc-600 text-center mt-3">Save your first snapshot to start tracking net worth over time.</p>
+          <p className="text-[10px] text-center mt-3" style={{ color: "var(--text-muted)" }}>Save your first snapshot to start tracking net worth over time.</p>
         )}
       </GlassCard>
     </div>

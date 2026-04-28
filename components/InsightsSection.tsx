@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
-import { parseISO, getDay, subDays, isAfter } from "date-fns";
+import { parseISO, getDay, subDays, startOfWeek, addDays, format } from "date-fns";
 import { MOOD_COLORS } from "@/lib/mood";
 import { useChartTheme } from "@/lib/chartTheme";
+
+interface HealthMetric {
+  id: number;
+  date: string;
+  type: string;
+  value: number;
+  unit: string | null;
+}
 
 interface Entry {
   date: string;
@@ -99,6 +107,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   const [aiData, setAiData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const theme = useChartTheme();
 
   async function loadInsights() {
@@ -130,6 +139,13 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   }, []);
 
   useEffect(() => { loadInsights(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetch("/api/health/metrics?days=90")
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setHealthMetrics(d); })
+      .catch(() => {});
+  }, []);
 
   if (entries.length < 7) return <p className="text-sm" style={{ color: "var(--text-dim)" }}>Not enough data yet.</p>;
 
@@ -190,6 +206,46 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   // Mood distribution
   const dist: Record<string, number> = { rad: 0, good: 0, meh: 0, bad: 0, awful: 0 };
   for (const e of entries) dist[e.mood] = (dist[e.mood] ?? 0) + 1;
+
+  // ── Sleep × Mood correlation ──────────────────────────────────────────────────
+  const sleepByDate: Record<string, number> = {};
+  for (const m of healthMetrics) {
+    if (m.type === "sleep_total") sleepByDate[m.date] = m.value;
+  }
+  const goodSleepMoods: number[] = [], poorSleepMoods: number[] = [];
+  for (const e of entries) {
+    const hrs = sleepByDate[e.date] ?? sleepByDate[subDays(parseISO(e.date), 1).toISOString().split("T")[0]];
+    if (hrs === undefined) continue;
+    if (hrs >= 7) goodSleepMoods.push(e.moodScore);
+    else poorSleepMoods.push(e.moodScore);
+  }
+  const avgArr = (a: number[]) => a.length ? +(a.reduce((s, v) => s + v, 0) / a.length).toFixed(2) : null;
+  const sleepCorr = goodSleepMoods.length >= 5 && poorSleepMoods.length >= 5
+    ? { good: avgArr(goodSleepMoods)!, poor: avgArr(poorSleepMoods)!, nGood: goodSleepMoods.length, nPoor: poorSleepMoods.length }
+    : null;
+
+  // ── HRV trend (stress proxy) ──────────────────────────────────────────────────
+  const d14 = subDays(now, 14).toISOString().split("T")[0];
+  const d28 = subDays(now, 28).toISOString().split("T")[0];
+  const recentHrv = healthMetrics.filter(m => m.type === "hrv" && m.date >= d14);
+  const prevHrv = healthMetrics.filter(m => m.type === "hrv" && m.date >= d28 && m.date < d14);
+  const recentHrvAvg = avgArr(recentHrv.map(m => m.value));
+  const prevHrvAvg = avgArr(prevHrv.map(m => m.value));
+  const hrvTrend = recentHrvAvg !== null && prevHrvAvg !== null
+    ? { recent: recentHrvAvg, prev: prevHrvAvg, delta: +(recentHrvAvg - prevHrvAvg).toFixed(1) }
+    : null;
+
+  // ── Weekly activity heatmap (last 5 weeks) ────────────────────────────────────
+  const KEY_ACTS = ["exercise", "good sleep", "bad sleep", "no alcohol", "anxiety attack", "sick"];
+  const recentWeeks = Array.from({ length: 5 }, (_, i) => {
+    const weekStart = startOfWeek(subDays(now, i * 7), { weekStartsOn: 1 });
+    const weekEnd = addDays(weekStart, 6);
+    const ws = weekStart.toISOString().split("T")[0];
+    const we = weekEnd.toISOString().split("T")[0];
+    const weekEntries = entries.filter(e => e.date >= ws && e.date <= we);
+    const logged = new Set(weekEntries.flatMap(e => e.activities ?? []));
+    return { label: format(weekStart, "MMM d"), logged };
+  }).reverse();
 
   return (
     <div className="space-y-5">
@@ -334,6 +390,97 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
           </div>
         </div>
       )}
+
+      {/* Sleep × Mood */}
+      {sleepCorr && (
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>Sleep vs Mood</p>
+          <div className="glass rounded-2xl p-4">
+            <CorrelationBar
+              label="Sleep quality"
+              high={sleepCorr.good}
+              low={sleepCorr.poor}
+              highLabel={`≥7h (${sleepCorr.nGood} nights)`}
+              lowLabel={`<7h (${sleepCorr.nPoor} nights)`}
+            />
+            <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
+              {sleepCorr.good > sleepCorr.poor
+                ? `7h+ sleep is associated with +${(sleepCorr.good - sleepCorr.poor).toFixed(1)} pts better mood`
+                : "No significant mood boost from extra sleep in your data yet"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* HRV trend */}
+      {hrvTrend && (
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>HRV · Stress Signal</p>
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-2xl font-bold" style={{ color: hrvTrend.delta >= 0 ? "var(--c-positive)" : "var(--c-negative)" }}>
+                  {hrvTrend.recent.toFixed(0)} ms
+                </p>
+                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>14-day avg HRV</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold" style={{ color: hrvTrend.delta >= 0 ? "var(--c-positive)" : "var(--c-negative)" }}>
+                  {hrvTrend.delta >= 0 ? "↑" : "↓"} {Math.abs(hrvTrend.delta)} ms
+                </p>
+                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>vs prior 2 weeks</p>
+              </div>
+            </div>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              {hrvTrend.delta <= -5
+                ? "HRV dropping — your nervous system is under more stress than usual. Prioritise recovery."
+                : hrvTrend.delta >= 5
+                  ? "HRV improving — your body is recovering well. Keep it up."
+                  : "HRV stable — stress load roughly unchanged from last fortnight."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly activity heatmap */}
+      <div>
+        <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>Activity · Last 5 Weeks</p>
+        <div className="glass rounded-2xl p-4 overflow-x-auto">
+          <table className="w-full text-[10px]" style={{ borderCollapse: "separate", borderSpacing: "3px" }}>
+            <thead>
+              <tr>
+                <td className="pr-2" style={{ color: "var(--text-muted)", minWidth: 80 }}></td>
+                {recentWeeks.map(w => (
+                  <td key={w.label} className="text-center" style={{ color: "var(--text-muted)", minWidth: 36 }}>{w.label}</td>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {KEY_ACTS.map(act => {
+                const isAvoid = act.startsWith("no ");
+                return (
+                  <tr key={act}>
+                    <td className="pr-2 py-0.5 capitalize" style={{ color: "var(--text-dim)" }}>{act}</td>
+                    {recentWeeks.map(w => {
+                      const logged = w.logged.has(act);
+                      const positive = logged && !["bad sleep", "anxiety attack", "sick"].includes(act);
+                      const negative = logged && ["bad sleep", "anxiety attack", "sick"].includes(act);
+                      const bg = logged
+                        ? positive ? "var(--c-positive)" : negative ? "var(--c-negative)" : "var(--c-primary)"
+                        : "var(--divider)";
+                      return (
+                        <td key={w.label} className="text-center py-0.5">
+                          <div className="w-7 h-5 rounded mx-auto" style={{ background: bg, opacity: logged ? 0.85 : 0.3 }} title={logged ? `${act} logged` : "not logged"} />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
