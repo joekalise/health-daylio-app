@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
@@ -81,8 +83,8 @@ export async function GET() {
   // Finance
   let budgetEntries: { name: string; value: number; type: string | null }[] = [];
   let netWorthLatest: number | null = null;
-  if (snapshot) {
-    const entries = await db.select().from(financeEntries).where(eq(financeEntries.snapshotId, snapshot[0]?.id ?? 0));
+  if (snapshot.length) {
+    const entries = await db.select().from(financeEntries).where(eq(financeEntries.snapshotId, snapshot[0].id));
     budgetEntries = entries.map(e => ({ name: e.name, value: e.value, type: (e.metadata as { type?: string } | null)?.type ?? null }));
     const balances = await db.select().from(financeBalances).orderBy(desc(financeBalances.date));
     const netWorthIds = new Set(accounts.filter(a => a.isNetWorth).map(a => a.id));
