@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, timestamp, date, jsonb, serial, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, date, jsonb, serial, numeric, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const moodEntries = pgTable("mood_entries", {
   id: serial("id").primaryKey(),
@@ -22,7 +22,9 @@ export const healthMetrics = pgTable("health_metrics", {
   metadata: jsonb("metadata"), // workout name, sleep stages, etc.
   source: text("source").notNull().default("apple_health"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("health_metrics_date_type_unique").on(t.date, t.type),
+]);
 
 export const financeSnapshots = pgTable("finance_snapshots", {
   id: serial("id").primaryKey(),

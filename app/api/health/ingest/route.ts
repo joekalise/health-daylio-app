@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { healthMetrics } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { sql } from "drizzle-orm";
 
-// Simple flat payload from iOS Shortcuts
 interface ShortcutsPayload {
   date: string; // YYYY-MM-DD
   steps?: number;
@@ -12,13 +12,28 @@ interface ShortcutsPayload {
   active_energy?: number;
   walking_distance?: number;
   flights_climbed?: number;
-  sleep_total?: number;   // hours
+  sleep_total?: number;
   sleep_deep?: number;
   sleep_rem?: number;
   sleep_core?: number;
   weight?: number;
   spo2?: number;
+  vo2max?: number;
+  respiratory_rate?: number;
 }
+
+const UNITS: Record<string, string> = {
+  steps: "count",
+  resting_hr: "bpm",
+  hrv: "ms",
+  active_energy: "kcal",
+  walking_distance: "km",
+  flights_climbed: "count",
+  weight: "kg",
+  spo2: "%",
+  vo2max: "mL/kg/min",
+  respiratory_rate: "bpm",
+};
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
@@ -32,35 +47,15 @@ export async function POST(req: NextRequest) {
 
   if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
 
-  const UNITS: Record<string, string> = {
-    steps: "count",
-    resting_hr: "bpm",
-    hrv: "ms",
-    active_energy: "kcal",
-    walking_distance: "km",
-    flights_climbed: "count",
-    weight: "kg",
-    spo2: "%",
-  };
+  const rows: typeof healthMetrics.$inferInsert[] = [];
 
-  const inserts: {
-    date: string;
-    type: string;
-    value: number;
-    unit: string | null;
-    metadata: Record<string, unknown> | null;
-    source: string;
-  }[] = [];
-
-  // Flat metrics
   for (const [type, value] of Object.entries(rest)) {
     if (value == null || typeof value !== "number") continue;
-    inserts.push({ date, type, value, unit: UNITS[type] ?? null, metadata: null, source: "apple_health" });
+    rows.push({ date, type, value, unit: UNITS[type] ?? null, metadata: null, source: "apple_health" });
   }
 
-  // Sleep as one combined row
   if (sleep_total != null) {
-    inserts.push({
+    rows.push({
       date,
       type: "sleep_total",
       value: sleep_total,
@@ -70,9 +65,31 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (inserts.length === 0) return NextResponse.json({ inserted: 0 });
+  if (rows.length === 0) return NextResponse.json({ ok: true, upserted: 0 });
 
-  await db.insert(healthMetrics).values(inserts).onConflictDoNothing();
+  // Upsert — update value + metadata if a record for (date, type) already exists
+  await db.insert(healthMetrics)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [healthMetrics.date, healthMetrics.type],
+      set: {
+        value: sql`excluded.value`,
+        metadata: sql`excluded.metadata`,
+        createdAt: sql`now()`,
+      },
+    });
 
-  return NextResponse.json({ inserted: inserts.length });
+  return NextResponse.json({ ok: true, upserted: rows.length, date });
+}
+
+// Status endpoint — GET to check last sync time
+export async function GET() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const result = await db.execute(
+    sql`SELECT type, MAX(date) as latest FROM health_metrics GROUP BY type ORDER BY latest DESC`
+  );
+  const latest = result.rows[0]?.latest as string | null;
+  return NextResponse.json({ lastSync: latest, byType: result.rows });
 }

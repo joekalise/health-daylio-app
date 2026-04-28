@@ -175,12 +175,16 @@ function ManualEntry({ onSaved }: { onSaved: () => void }) {
 export default function HealthSection({ days }: { days: number }) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   function reload() {
     setLoading(true);
     fetch(`/api/health/metrics?days=${days}`)
       .then((r) => r.json())
       .then((d) => { setMetrics(d); setLoading(false); });
+    fetch("/api/health/ingest")
+      .then((r) => r.json())
+      .then((d) => setLastSync(d.lastSync ?? null));
   }
 
   useEffect(() => { reload(); }, [days]);
@@ -196,8 +200,27 @@ export default function HealthSection({ days }: { days: number }) {
 
   const recentWorkouts = workoutRows.slice(0, 5);
 
+  const daysSinceSync = lastSync
+    ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
+    : null;
+
   return (
     <div className="space-y-6">
+      {/* Sync status */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${daysSinceSync === 0 ? "bg-emerald-400" : daysSinceSync !== null && daysSinceSync <= 1 ? "bg-yellow-400" : "bg-red-400"}`} />
+          <span className="text-xs text-zinc-500">
+            {lastSync
+              ? daysSinceSync === 0 ? "Synced today" : `Last synced ${daysSinceSync}d ago`
+              : "No sync data"}
+          </span>
+        </div>
+        {daysSinceSync !== null && daysSinceSync > 1 && (
+          <span className="text-[10px] text-red-400/70">Shortcuts may not be running</span>
+        )}
+      </div>
+
       {/* Summary row */}
       <div className="grid grid-cols-4 gap-2">
         <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="#22c55e" />
