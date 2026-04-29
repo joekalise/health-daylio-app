@@ -209,12 +209,15 @@ function ManualEntry({ onSaved }: { onSaved: () => void }) {
 
 interface StravaWorkout {
   id: number;
+  stravaId: string | null;
   date: string;
   name: string;
   sportType: string;
   durationSecs: number;
   distanceMeters: number | null;
+  elevationGain: number | null;
   avgHeartrate: number | null;
+  calories: number | null;
 }
 
 interface StravaStatus {
@@ -356,16 +359,34 @@ export default function HealthSection({ days }: { days: number }) {
               const mins = Math.round(w.durationSecs / 60);
               const km = w.distanceMeters ? (w.distanceMeters / 1000).toFixed(1) : null;
               const emoji = SPORT_EMOJI[w.sportType] ?? "💪";
-              return (
-                <div key={w.id} className={`flex items-center gap-3 py-2.5 ${i < strava.workouts!.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--divider)" }}>
+              const stravaUrl = w.stravaId ? `https://www.strava.com/activities/${w.stravaId}` : null;
+              const stats = [
+                format(parseISO(w.date), "MMM d"),
+                `${mins} min`,
+                km ? `${km} km` : null,
+                w.avgHeartrate ? `${Math.round(w.avgHeartrate)} bpm` : null,
+                w.elevationGain && w.elevationGain > 0 ? `↑${Math.round(w.elevationGain)}m` : null,
+                w.calories ? `${Math.round(w.calories)} kcal` : null,
+              ].filter(Boolean).join(" · ");
+              const inner = (
+                <>
                   <span className="text-lg flex-shrink-0">{emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>{w.name}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                      {format(parseISO(w.date), "MMM d")} · {mins} min{km ? ` · ${km} km` : ""}{w.avgHeartrate ? ` · ${Math.round(w.avgHeartrate)} bpm` : ""}
-                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{stats}</p>
                   </div>
-                </div>
+                  {stravaUrl && <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-dim)" }}>↗</span>}
+                </>
+              );
+              const cls = `flex items-center gap-3 py-2.5 transition-opacity ${i < strava.workouts!.length - 1 ? "border-b" : ""}`;
+              return stravaUrl ? (
+                <a key={w.id} href={stravaUrl} target="_blank" rel="noopener noreferrer"
+                  className={cls + " hover:opacity-70"}
+                  style={{ borderColor: "var(--divider)" }}>
+                  {inner}
+                </a>
+              ) : (
+                <div key={w.id} className={cls} style={{ borderColor: "var(--divider)" }}>{inner}</div>
               );
             })}
           </div>

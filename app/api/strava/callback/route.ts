@@ -35,24 +35,29 @@ export async function GET(req: NextRequest) {
   const data = await tokenRes.json();
   if (!data.access_token) return NextResponse.redirect(new URL("/dashboard", req.url));
 
-  await db.insert(stravaTokens).values({
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: data.expires_at,
-    athleteId: data.athlete.id,
-    athleteName: `${data.athlete.firstname} ${data.athlete.lastname}`.trim(),
-    athletePhoto: data.athlete.profile_medium ?? null,
-  }).onConflictDoUpdate({
-    target: [stravaTokens.athleteId],
-    set: {
+  try {
+    await db.insert(stravaTokens).values({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: data.expires_at,
+      athleteId: data.athlete.id,
       athleteName: `${data.athlete.firstname} ${data.athlete.lastname}`.trim(),
       athletePhoto: data.athlete.profile_medium ?? null,
-      updatedAt: new Date(),
-    },
-  });
+    }).onConflictDoUpdate({
+      target: [stravaTokens.athleteId],
+      set: {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: data.expires_at,
+        athleteName: `${data.athlete.firstname} ${data.athlete.lastname}`.trim(),
+        athletePhoto: data.athlete.profile_medium ?? null,
+        updatedAt: new Date(),
+      },
+    });
+  } catch (e) {
+    console.error("Strava token save failed:", e);
+    return NextResponse.redirect(new URL("/dashboard?strava_error=1", req.url));
+  }
 
   // Initial sync — last 6 months
   try { await syncStravaActivities(180); } catch { /* non-fatal */ }
