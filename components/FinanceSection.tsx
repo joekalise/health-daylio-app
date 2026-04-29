@@ -318,7 +318,7 @@ export default function FinanceSection() {
             {yearsLeft !== null && (
               <div className="text-right">
                 <span className="text-lg font-bold text-violet-300">{yearsLeft}y</span>
-                <p className="text-[10px] text-zinc-600">
+                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                   {fireSettings.retireAge ? `retire at ${fireSettings.retireAge}` : "to go"}
                 </p>
               </div>

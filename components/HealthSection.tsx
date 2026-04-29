@@ -130,83 +130,6 @@ function StatCard({ label, value, unit, color }: { label: string; value: string 
   );
 }
 
-function ManualEntry({ onSaved }: { onSaved: () => void }) {
-  const today = new Date().toISOString().split("T")[0];
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(today);
-  const [fields, setFields] = useState({ steps: "", hrv: "", resting_hr: "", sleep_total: "", sleep_deep: "", sleep_rem: "", weight: "" });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  function set(k: keyof typeof fields, v: string) { setFields(p => ({ ...p, [k]: v })); }
-
-  async function save() {
-    setSaving(true);
-    const body: Record<string, unknown> = { date };
-    for (const [k, v] of Object.entries(fields)) {
-      const n = parseFloat(v);
-      if (!isNaN(n) && v !== "") body[k] = n;
-    }
-    await fetch("/api/health/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": "" },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    setSaved(true);
-    setOpen(false);
-    onSaved();
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  const inputClass = "w-full glass rounded-xl px-3 py-2 text-sm focus:outline-none"
-    + " " + ""; // colour via style prop below
-
-  return (
-    <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="text-xs transition-colors"
-        style={{ color: "var(--c-primary)" }}
-      >
-        {open ? "Cancel" : saved ? "Saved ✓" : "+ Add / correct metrics"}
-      </button>
-      {open && (
-        <div className="mt-3 space-y-3">
-          <div>
-            <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: "var(--text-muted)" }}>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass}
-              style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              ["steps", "Steps"],
-              ["hrv", "HRV (ms)"],
-              ["resting_hr", "Resting HR (bpm)"],
-              ["sleep_total", "Sleep total (hr)"],
-              ["sleep_deep", "Sleep deep (hr)"],
-              ["sleep_rem", "Sleep REM (hr)"],
-              ["weight", "Weight (kg)"],
-            ] as const).map(([key, label]) => (
-              <div key={key}>
-                <label className="text-[10px] block mb-1" style={{ color: "var(--text-muted)" }}>{label}</label>
-                <input type="number" step="any" placeholder="—" value={fields[key]} onChange={e => set(key, e.target.value)}
-                  className={inputClass}
-                  style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }} />
-              </div>
-            ))}
-          </div>
-          <button onClick={save} disabled={saving}
-            className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-            style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}>
-            {saving ? "Saving..." : "Save metrics"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface StravaWorkout {
   id: number;
   stravaId: string | null;
@@ -264,7 +187,14 @@ export default function HealthSection({ days }: { days: number }) {
 
   useEffect(() => { reload(); }, [days]);
 
-  if (loading) return <p className="text-sm" style={{ color: "var(--text-dim)" }}>Loading health data...</p>;
+  if (loading) return (
+    <div className="space-y-4 animate-pulse">
+      <div className="grid grid-cols-4 gap-2">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-16 rounded-2xl" style={{ background: "var(--surface)" }} />)}
+      </div>
+      {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-2xl" style={{ background: "var(--surface)" }} />)}
+    </div>
+  );
   if (!metrics.length) return <p className="text-sm" style={{ color: "var(--text-dim)" }}>No health data yet.</p>;
 
   const steps = groupByDate(metrics, "steps");

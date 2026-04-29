@@ -593,21 +593,19 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
 
         {/* FINANCE TAB */}
         {tab === "Finance" && (
-          <FinanceSection />
+          <div className="space-y-4">
+            <FinanceSection />
+          </div>
         )}
 
         {/* INSIGHTS TAB */}
         {tab === "Insights" && (
-          <section className="glass rounded-2xl p-4">
-            <h2 className="font-semibold mb-4">Insights</h2>
-            <InsightsSection entries={entries} />
-          </section>
+          <InsightsSection entries={entries} />
         )}
 
         {/* CHAT TAB */}
         {tab === "Chat" && (
           <section className="glass rounded-2xl p-4">
-            <h2 className="font-semibold mb-4">Ask about your data</h2>
             <ChatPanel />
           </section>
         )}
