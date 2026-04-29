@@ -12,6 +12,7 @@ const METRIC_MAP: Record<string, string> = {
   walking_running_distance: "walking_distance",
   active_energy: "active_energy",
   body_mass: "weight",
+  weight: "weight",
   body_fat_percentage: "body_fat",
   vo2_max: "vo2max",
   respiratory_rate: "respiratory_rate",
