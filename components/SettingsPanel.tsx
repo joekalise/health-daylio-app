@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import ProfileSection from "./ProfileSection";
 
-type Tab = "profile" | "budget" | "fire" | "uploads";
+type Tab = "profile" | "budget" | "fire";
 
 // ── Budget tab ────────────────────────────────────────────────────────────────
 interface Entry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
@@ -220,89 +220,11 @@ function FireTab() {
   );
 }
 
-// ── Uploads tab ───────────────────────────────────────────────────────────────
-function UploadsTab() {
-  const today = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(today);
-  const [fields, setFields] = useState({ steps: "", hrv: "", resting_hr: "", sleep_total: "", sleep_deep: "", sleep_rem: "", weight: "" });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  function set(k: keyof typeof fields, v: string) { setFields(p => ({ ...p, [k]: v })); }
-
-  async function save() {
-    setSaving(true);
-    const body: Record<string, unknown> = { date };
-    for (const [k, v] of Object.entries(fields)) {
-      const n = parseFloat(v);
-      if (!isNaN(n) && v !== "") body[k] = n;
-    }
-    await fetch("/api/health/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setSaving(false);
-    setSaved(true);
-    setFields({ steps: "", hrv: "", resting_hr: "", sleep_total: "", sleep_deep: "", sleep_rem: "", weight: "" });
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  const inputClass = "w-full glass rounded-xl px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none";
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-xs text-zinc-400 font-medium mb-1">Manual health metrics</p>
-        <p className="text-[10px] text-zinc-600 leading-relaxed">Backfill or correct a day's metrics. Your iOS Shortcuts automation handles daily ingestion automatically.</p>
-      </div>
-
-      <div>
-        <label className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1">Date</label>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {([
-          ["steps", "Steps"],
-          ["hrv", "HRV (ms)"],
-          ["resting_hr", "Resting HR (bpm)"],
-          ["sleep_total", "Sleep total (hr)"],
-          ["sleep_deep", "Sleep deep (hr)"],
-          ["sleep_rem", "Sleep REM (hr)"],
-          ["weight", "Weight (kg)"],
-        ] as const).map(([key, label]) => (
-          <div key={key}>
-            <label className="text-[10px] text-zinc-500 block mb-1">{label}</label>
-            <input type="number" step="any" placeholder="—" value={fields[key]} onChange={e => set(key, e.target.value)} className={inputClass} />
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={save}
-        disabled={saving}
-        className="w-full py-3 rounded-2xl font-medium text-sm transition-all disabled:opacity-50"
-        style={{ background: saved ? "rgba(34,197,94,0.2)" : "rgba(99,102,241,0.3)", border: `1px solid ${saved ? "rgba(34,197,94,0.4)" : "rgba(99,102,241,0.4)"}`, color: saved ? "#86efac" : "#a5b4fc" }}
-      >
-        {saving ? "Saving..." : saved ? "Saved ✓" : "Save metrics"}
-      </button>
-
-      <div className="pt-2 border-t border-white/5">
-        <p className="text-xs text-zinc-400 font-medium mb-1">Bulk import (Apple Health)</p>
-        <p className="text-[10px] text-zinc-600 leading-relaxed">
-          For historical imports, export your Apple Health data from the Health app, then run:
-        </p>
-        <code className="block mt-2 text-[10px] text-indigo-300 bg-white/5 rounded-lg px-3 py-2 font-mono leading-relaxed">
-          npm run import:health path/to/export.xml
-        </code>
-      </div>
-    </div>
-  );
-}
-
 // ── Main SettingsPanel ────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string }[] = [
   { id: "profile", label: "Profile" },
   { id: "budget", label: "Budget" },
   { id: "fire", label: "FIRE" },
-  { id: "uploads", label: "Uploads" },
 ];
 
 export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (photo: string) => void }) {
@@ -328,7 +250,6 @@ export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (phot
       {tab === "profile" && <ProfileSection onPhotoChange={onPhotoChange} />}
       {tab === "budget" && <BudgetTab />}
       {tab === "fire" && <FireTab />}
-      {tab === "uploads" && <UploadsTab />}
     </div>
   );
 }

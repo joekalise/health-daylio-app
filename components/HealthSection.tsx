@@ -285,9 +285,6 @@ export default function HealthSection({ days }: { days: number }) {
               : "No sync data"}
           </span>
         </div>
-        {daysSinceSync !== null && daysSinceSync > 1 && (
-          <span className="text-[10px] text-red-400/70">Shortcuts may not be running</span>
-        )}
       </div>
 
       {/* Summary row */}
