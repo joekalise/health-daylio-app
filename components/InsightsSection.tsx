@@ -103,8 +103,24 @@ function CorrelationBar({ label, high, low, highLabel, lowLabel }: {
   );
 }
 
+const CACHE_KEY = "insights_cache_v2";
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function readCache(): { data: InsightsData; cachedAt: number } | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function writeCache(data: InsightsData) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() })); } catch {}
+}
+
 export default function InsightsSection({ entries }: { entries: Entry[] }) {
   const [aiData, setAiData] = useState<InsightsData | null>(null);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
@@ -118,27 +134,26 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
       setAiData(data);
-      try { sessionStorage.setItem("insights_cache", JSON.stringify(data)); } catch {}
+      setCachedAt(Date.now());
+      writeCache(data);
     } catch (e) {
-      // Keep last cached result if available
-      try {
-        const cached = sessionStorage.getItem("insights_cache");
-        if (cached) { setAiData(JSON.parse(cached)); setError(`Showing cached result (${e instanceof Error ? e.message : "error"}) — tap refresh to retry.`); }
-        else setError(`Failed: ${e instanceof Error ? e.message : "unknown error"}. Tap refresh to try again.`);
-      } catch { setError("Couldn't load insights. Tap refresh to try again."); }
+      setError(`Failed: ${e instanceof Error ? e.message : "unknown error"}. Tap refresh to try again.`);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    // Load from cache immediately while fetching
-    try {
-      const cached = sessionStorage.getItem("insights_cache");
-      if (cached) setAiData(JSON.parse(cached));
-    } catch {}
-  }, []);
-
-  useEffect(() => { loadInsights(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const cached = readCache();
+    if (cached) {
+      setAiData(cached.data);
+      setCachedAt(cached.cachedAt);
+      // Only auto-refresh if cache is older than 7 days
+      if (Date.now() - cached.cachedAt > CACHE_TTL_MS) loadInsights();
+    } else {
+      // No cache at all — fetch automatically the first time
+      loadInsights();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch("/api/health/metrics?days=90")
@@ -249,11 +264,16 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-muted)" }}>AI Analysis</p>
-          {aiData?.generatedAt && (
-            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-              Updated {new Date(aiData.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
+          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {cachedAt
+              ? (() => {
+                  const days = Math.floor((Date.now() - cachedAt) / 86400000);
+                  if (days === 0) return `Updated today · refreshes weekly`;
+                  if (days === 1) return `Updated yesterday · refreshes weekly`;
+                  return `Updated ${days} days ago · refreshes weekly`;
+                })()
+              : "On demand — tap refresh to generate"}
+          </p>
         </div>
         <button
           onClick={loadInsights}
