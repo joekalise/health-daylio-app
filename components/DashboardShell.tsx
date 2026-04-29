@@ -71,10 +71,19 @@ function relativeDate(dateStr: string) {
   return format(d, "MMM d");
 }
 
+interface FlareReason {
+  text: string;
+  entries: { id: number; date: string }[];
+}
+
 interface FlareRisk {
   level: "warning" | "high";
-  reasons: string[];
+  reasons: FlareReason[];
   advice: string;
+}
+
+function fmt(date: string) {
+  return format(parseISO(date), "MMM d");
 }
 
 function computeFlareRisk(entries: Entry[]): FlareRisk | null {
@@ -89,75 +98,81 @@ function computeFlareRisk(entries: Entry[]): FlareRisk | null {
   const baseline = entries.filter(e => e.date >= d(90));
 
   const avg = (arr: Entry[]) => arr.length ? arr.reduce((s, e) => s + e.moodScore, 0) / arr.length : null;
-  const hasActivity = (arr: Entry[], act: string) => arr.some(e => e.activities?.includes(act));
-  const countActivity = (arr: Entry[], act: string) => arr.filter(e => e.activities?.includes(act)).length;
+  const entriesWithActivity = (arr: Entry[], act: string) => arr.filter(e => e.activities?.includes(act));
 
   const baselineAvg = avg(baseline) ?? 3.5;
   const recent3Avg = avg(last3);
   const recent14Avg = avg(last14);
 
-  const reasons: string[] = [];
+  const reasons: FlareReason[] = [];
 
-  // ── AS flare triggers ────────────────────────────────────────────
-  // Sick / immune stress — a big AS trigger
-  if (hasActivity(last7, "sick")) {
-    reasons.push("Illness logged — infections are a known AS flare trigger");
+  // Sick / immune stress
+  const sickEntries = entriesWithActivity(last7, "sick");
+  if (sickEntries.length > 0) {
+    reasons.push({ text: "Illness logged — infections are a known AS flare trigger", entries: sickEntries.map(e => ({ id: e.id, date: e.date })) });
   }
 
-  // Sleep quality poor — poor sleep spikes inflammatory markers
-  const badSleepDays = countActivity(last7, "bad sleep") + countActivity(last7, "medium sleep");
-  const goodSleepDays = countActivity(last7, "good sleep");
-  if (badSleepDays >= 3 && badSleepDays > goodSleepDays) {
-    reasons.push(`${badSleepDays} nights of poor sleep — disrupted sleep worsens AS inflammation`);
+  // Poor sleep
+  const badSleepEntries = [
+    ...entriesWithActivity(last7, "bad sleep"),
+    ...entriesWithActivity(last7, "medium sleep"),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+  const goodSleepCount = entriesWithActivity(last7, "good sleep").length;
+  if (badSleepEntries.length >= 3 && badSleepEntries.length > goodSleepCount) {
+    reasons.push({ text: `${badSleepEntries.length} nights of poor sleep — disrupted sleep worsens AS inflammation`, entries: badSleepEntries.map(e => ({ id: e.id, date: e.date })) });
   }
 
-  // No exercise when they usually do — movement is protective for AS
-  const usuallyExercises = countActivity(baseline, "exercise") / Math.max(baseline.length, 1) > 0.2;
-  if (usuallyExercises && !hasActivity(last7, "exercise")) {
-    reasons.push("No movement in 7 days — exercise helps keep AS in check");
+  // No exercise when they usually do
+  const usuallyExercises = entriesWithActivity(baseline, "exercise").length / Math.max(baseline.length, 1) > 0.2;
+  if (usuallyExercises && entriesWithActivity(last7, "exercise").length === 0) {
+    reasons.push({ text: "No movement in 7 days — exercise helps keep AS in check", entries: [] });
   }
 
-  // Mood in free-fall — pain + mood are bidirectional in AS
+  // Mood in free-fall
   if (recent3Avg !== null && recent3Avg < baselineAvg - 0.8) {
-    reasons.push(`Mood ${(baselineAvg - recent3Avg).toFixed(1)} pts below your normal — often precedes or accompanies a flare`);
+    const lowEntries = last3.filter(e => e.moodScore < baselineAvg - 0.5);
+    reasons.push({ text: `Mood ${(baselineAvg - recent3Avg).toFixed(1)} pts below your normal`, entries: lowEntries.map(e => ({ id: e.id, date: e.date })) });
   }
 
   // Declining trajectory
   if (last3.length >= 3) {
     const sorted = [...last3].sort((a, b) => a.date.localeCompare(b.date));
     if (sorted[0].moodScore > sorted[sorted.length - 1].moodScore + 1) {
-      reasons.push("Mood declining day-on-day this week");
+      reasons.push({ text: "Mood declining day-on-day", entries: sorted.map(e => ({ id: e.id, date: e.date })) });
     }
   }
 
-  // Stress indicators (AS is stress-sensitive)
-  const anxietyAttacks = countActivity(last7, "anxiety attack");
-  if (anxietyAttacks > 0) {
-    reasons.push(`${anxietyAttacks} anxiety attack${anxietyAttacks > 1 ? "s" : ""} — stress is a major AS trigger`);
+  // Anxiety attacks
+  const attackEntries = entriesWithActivity(last7, "anxiety attack");
+  if (attackEntries.length > 0) {
+    reasons.push({ text: `${attackEntries.length} anxiety attack${attackEntries.length > 1 ? "s" : ""} — stress is a major AS trigger`, entries: attackEntries.map(e => ({ id: e.id, date: e.date })) });
   }
 
-  // Alcohol — pro-inflammatory
-  const alcoholDays = last7.filter(e => e.activities && !e.activities.includes("no alcohol")).length;
-  if (alcoholDays >= 4 && last7.length >= 5) {
-    reasons.push("High alcohol intake this week — pro-inflammatory, can trigger AS flares");
+  // Alcohol — only flag if user actively tracks "no alcohol" AND went a full week without logging it
+  const tracksAlcohol = entriesWithActivity(baseline, "no alcohol").length >= 5;
+  const noAlcoholThisWeek = entriesWithActivity(last7, "no alcohol").length === 0;
+  const usuallyLogsNoAlcohol = entriesWithActivity(baseline.filter(e => e.date >= d(14) && e.date < d(7)), "no alcohol").length >= 3;
+  if (tracksAlcohol && noAlcoholThisWeek && usuallyLogsNoAlcohol && last7.length >= 4) {
+    reasons.push({ text: "No alcohol-free days logged this week — unusual for you", entries: [] });
   }
 
   // Worse than 2-week avg
   if (recent3Avg !== null && recent14Avg !== null && recent3Avg < recent14Avg - 0.6 && recent3Avg < 3) {
-    if (!reasons.some(r => r.includes("pts below"))) {
-      reasons.push("Notably worse than your 2-week average");
+    if (!reasons.some(r => r.text.includes("pts below"))) {
+      const lowEntries = last3.filter(e => e.moodScore < 3);
+      reasons.push({ text: "Notably worse than your 2-week average", entries: lowEntries.map(e => ({ id: e.id, date: e.date })) });
     }
   }
 
   if (reasons.length === 0) return null;
 
-  const isHighRisk = reasons.length >= 3 || hasActivity(last3, "sick") || (recent3Avg !== null && recent3Avg < 2.3);
+  const isHighRisk = reasons.length >= 3 || (sickEntries.length > 0 && last3.some(e => e.activities?.includes("sick"))) || (recent3Avg !== null && recent3Avg < 2.3);
   const level: FlareRisk["level"] = isHighRisk ? "high" : "warning";
 
   const highAdvice = [
     "Multiple warning signs active. Rest, anti-inflammatories if needed, and avoid anything that taxes your immune system right now.",
     "Your data is stacking up warning signs. This is the time to be proactive, not push through.",
-    "Seriously — protect your sleep, cut alcohol, and move gently. Don't wait for the flare to arrive.",
+    "Seriously — protect your sleep, move gently. Don't wait for the flare to arrive.",
   ];
   const warnAdvice = [
     "Early warning signs for an AS flare. Prioritise sleep, keep moving, and manage stress before this escalates.",
@@ -191,11 +206,22 @@ function FlareWarning({ risk }: { risk: FlareRisk }) {
         </div>
         <button onClick={() => setDismissed(true)} className="text-xs flex-shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }}>dismiss</button>
       </div>
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {risk.reasons.map((r, i) => (
-          <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "var(--text-dim)" }}>
-            <span className="mt-0.5 flex-shrink-0" style={{ color }}>›</span>
-            {r}
+          <li key={i} style={{ color: "var(--text-dim)" }}>
+            <div className="flex items-start gap-2 text-xs">
+              <span className="mt-0.5 flex-shrink-0" style={{ color }}>›</span>
+              <span>{r.text}</span>
+            </div>
+            {r.entries.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1 ml-4">
+                {r.entries.map(({ id, date }) => (
+                  <Link key={id} href={`/entries/${id}`} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: `${border}20`, color }}>
+                    {fmt(date)}
+                  </Link>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ul>
