@@ -90,6 +90,14 @@ export async function GET() {
   const result = await db.execute(
     sql`SELECT MAX(created_at) as last_synced_at FROM health_metrics WHERE source = 'apple_health'`
   );
-  const lastSync = result.rows[0]?.last_synced_at as string | null;
+  const raw = result.rows[0]?.last_synced_at as string | Date | null;
+  // Neon returns TIMESTAMP WITHOUT TIME ZONE as a string with no 'Z', so JS parses it as
+  // local time instead of UTC. Normalise to a proper UTC ISO string before sending.
+  let lastSync: string | null = null;
+  if (raw instanceof Date) {
+    lastSync = raw.toISOString();
+  } else if (typeof raw === "string") {
+    lastSync = raw.includes("Z") || raw.includes("+") ? raw : raw.replace(" ", "T") + "Z";
+  }
   return NextResponse.json({ lastSync });
 }
