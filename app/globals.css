@@ -29,11 +29,21 @@
   --c-positive-border: rgba(16,185,129,0.25);
   --c-heart: #ec4899;
   --c-heart-dim: rgba(236,72,153,0.15);
+  --c-heart-border: rgba(236,72,153,0.25);
   --c-caution: #f59e0b;
   --c-caution-dim: rgba(245,158,11,0.15);
   --c-caution-border: rgba(245,158,11,0.25);
   --c-negative: #f43f5e;
   --c-negative-dim: rgba(244,63,94,0.15);
+  --c-negative-border: rgba(244,63,94,0.25);
+
+  /* Stat cards */
+  --stat-bg-indigo: rgba(99,102,241,0.10);
+  --stat-border-indigo: rgba(99,102,241,0.22);
+  --stat-bg-violet: rgba(139,92,246,0.10);
+  --stat-border-violet: rgba(139,92,246,0.22);
+  --stat-bg-orange: rgba(249,115,22,0.10);
+  --stat-border-orange: rgba(249,115,22,0.22);
 
   /* Charts */
   --chart-grid: #27272a;
@@ -62,6 +72,12 @@
     --chart-tick: #a1a1aa;
     --tooltip-bg: #ffffff;
     --tooltip-border: #e4e4e7;
+    --stat-bg-indigo: rgba(99,102,241,0.08);
+    --stat-border-indigo: rgba(99,102,241,0.18);
+    --stat-bg-violet: rgba(139,92,246,0.08);
+    --stat-border-violet: rgba(139,92,246,0.18);
+    --stat-bg-orange: rgba(249,115,22,0.08);
+    --stat-border-orange: rgba(249,115,22,0.18);
   }
 }
 
@@ -72,7 +88,7 @@ body {
     radial-gradient(ellipse at 85% 85%, var(--bg-grad-2) 0%, transparent 55%);
   background-attachment: fixed;
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   min-height: 100vh;
 }
 

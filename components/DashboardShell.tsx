@@ -46,16 +46,21 @@ const RANGE_LABELS: Record<Range, string> = { 7: "7d", 30: "30d", 90: "90d", 180
 
 function RangePicker({ value, onChange }: { value: Range; onChange: (r: Range) => void }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value) as Range)}
-      className="text-xs font-medium rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
-      style={{ background: "var(--surface)", color: "var(--text-dim)", border: "1px solid var(--border)" }}
-    >
+    <div className="flex gap-1">
       {RANGES.map((r) => (
-        <option key={r} value={r}>{RANGE_LABELS[r]}</option>
+        <button
+          key={r}
+          onClick={() => onChange(r)}
+          className="text-[11px] font-medium px-2 py-1 rounded-lg transition-all"
+          style={r === value
+            ? { background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }
+            : { background: "transparent", color: "var(--text-dim)", border: "1px solid transparent" }
+          }
+        >
+          {RANGE_LABELS[r]}
+        </button>
       ))}
-    </select>
+    </div>
   );
 }
 
@@ -315,8 +320,8 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           <Avatar photo={profile?.photo} name={profile?.name} onClick={() => setTab("Profile")} />
         </div>
 
-        {/* Stats — only shown on mood-relevant tabs */}
-        {(tab === "Home" || tab === "Mood") && (
+        {/* Stats — only shown on Home */}
+        {tab === "Home" && (
           <div className="flex gap-2.5 mt-5">
             <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-indigo)", border: "1px solid var(--stat-border-indigo)" }}>
               <div className="text-xl font-bold text-indigo-500">{entries.length.toLocaleString()}</div>
@@ -355,19 +360,18 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                   <button onClick={() => setTab("Mood")} className="text-xs flex-shrink-0 px-3 py-1.5 rounded-xl" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)" }}>View all →</button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">Not logged today</p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Tap to log how you're feeling</p>
+                <button onClick={() => setTab("Mood")} className="w-full text-left">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-base">How are you feeling?</p>
+                      <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>You haven't logged today yet</p>
+                    </div>
+                    <div className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                      style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)" }}>
+                      ✏️
+                    </div>
                   </div>
-                  <button
-                    onClick={() => setTab("Mood")}
-                    className="px-4 py-2.5 rounded-xl text-sm font-medium flex-shrink-0"
-                    style={{ background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }}
-                  >
-                    ✏️ Log now
-                  </button>
-                </div>
+                </button>
               )}
             </section>
 
@@ -388,7 +392,10 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
             {/* Health + Finance snapshot tiles */}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => setTab("Health")} className="glass rounded-2xl p-4 text-left transition-opacity active:opacity-70">
-                <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-muted)" }}>💪 Health · 14d avg</p>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>💪 Health · 14d avg</p>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>›</span>
+                </div>
                 {homeSummary?.health ? (
                   <div className="space-y-2">
                     {homeSummary.health.steps !== null && (
@@ -419,7 +426,10 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               </button>
 
               <button onClick={() => setTab("Finance")} className="glass rounded-2xl p-4 text-left transition-opacity active:opacity-70">
-                <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-muted)" }}>💰 Finance</p>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>💰 Finance</p>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>›</span>
+                </div>
                 {homeSummary?.finance ? (
                   <div className="space-y-2">
                     {homeSummary.finance.netWorth !== null ? (
@@ -458,6 +468,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                         <p className="text-xs truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{e.activities.slice(0, 3).join(" · ")}</p>
                       )}
                     </div>
+                    <span className="text-sm flex-shrink-0" style={{ color: "var(--text-muted)" }}>›</span>
                   </Link>
                 ))}
               </div>
@@ -548,6 +559,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                             )}
                             {e.note && <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--text-dim)" }}>{e.note}</p>}
                           </div>
+                          <span className="text-sm flex-shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }}>›</span>
                         </Link>
                       ))}
                     </div>
