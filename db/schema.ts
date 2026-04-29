@@ -63,6 +63,34 @@ export const financeBalances = pgTable("finance_balances", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Strava OAuth tokens (single row — personal app)
+export const stravaTokens = pgTable("strava_tokens", {
+  id: serial("id").primaryKey(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: integer("expires_at").notNull(), // Unix timestamp
+  athleteId: integer("athlete_id").notNull().unique(),
+  athleteName: text("athlete_name"),
+  athletePhoto: text("athlete_photo"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Workouts synced from Strava (separate from health_metrics to allow multiple/day)
+export const workouts = pgTable("workouts", {
+  id: serial("id").primaryKey(),
+  stravaId: text("strava_id").unique(),
+  date: date("date").notNull(),
+  name: text("name").notNull(),
+  sportType: text("sport_type").notNull(),
+  durationSecs: integer("duration_secs").notNull(),
+  distanceMeters: real("distance_meters"),
+  elevationGain: real("elevation_gain"),
+  avgHeartrate: real("avg_heartrate"),
+  calories: real("calories"),
+  source: text("source").notNull().default("strava"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User profile for personalising Claude's responses
 export const userProfile = pgTable("user_profile", {
   id: serial("id").primaryKey(),

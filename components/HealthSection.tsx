@@ -159,21 +159,24 @@ function ManualEntry({ onSaved }: { onSaved: () => void }) {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const inputClass = "w-full glass rounded-xl px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none";
+  const inputClass = "w-full glass rounded-xl px-3 py-2 text-sm focus:outline-none"
+    + " " + ""; // colour via style prop below
 
   return (
-    <div className="mt-4 pt-4 border-t border-white/5">
+    <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--divider)" }}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+        className="text-xs transition-colors"
+        style={{ color: "var(--c-primary)" }}
       >
         {open ? "Cancel" : saved ? "Saved ✓" : "+ Add / correct metrics"}
       </button>
       {open && (
         <div className="mt-3 space-y-3">
           <div>
-            <label className="text-[10px] text-zinc-500 uppercase tracking-wide block mb-1">Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+            <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: "var(--text-muted)" }}>Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             {([
@@ -186,30 +189,54 @@ function ManualEntry({ onSaved }: { onSaved: () => void }) {
               ["weight", "Weight (kg)"],
             ] as const).map(([key, label]) => (
               <div key={key}>
-                <label className="text-[10px] text-zinc-500 block mb-1">{label}</label>
-                <input type="number" step="any" placeholder="—" value={fields[key]} onChange={e => set(key, e.target.value)} className={inputClass} />
+                <label className="text-[10px] block mb-1" style={{ color: "var(--text-muted)" }}>{label}</label>
+                <input type="number" step="any" placeholder="—" value={fields[key]} onChange={e => set(key, e.target.value)}
+                  className={inputClass}
+                  style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }} />
               </div>
             ))}
           </div>
-          <button
-            onClick={save}
-            disabled={saving}
+          <button onClick={save} disabled={saving}
             className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-            style={{ background: "rgba(99,102,241,0.3)", border: "1px solid rgba(99,102,241,0.4)", color: "#a5b4fc" }}
-          >
+            style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}>
             {saving ? "Saving..." : "Save metrics"}
           </button>
-          <p className="text-[10px] text-zinc-600">For bulk historical imports, run the CLI script with your Apple Health export XML.</p>
         </div>
       )}
     </div>
   );
 }
 
+interface StravaWorkout {
+  id: number;
+  date: string;
+  name: string;
+  sportType: string;
+  durationSecs: number;
+  distanceMeters: number | null;
+  avgHeartrate: number | null;
+}
+
+interface StravaStatus {
+  connected: boolean;
+  athleteName?: string;
+  athletePhoto?: string;
+  lastSync?: string;
+  workouts?: StravaWorkout[];
+}
+
+const SPORT_EMOJI: Record<string, string> = {
+  Run: "🏃", Ride: "🚴", Swim: "🏊", Walk: "🚶", Hike: "🥾",
+  WeightTraining: "🏋️", Yoga: "🧘", Workout: "💪", VirtualRide: "🚴",
+  AlpineSki: "⛷️", Crossfit: "💪", Rowing: "🚣", Golf: "⛳",
+};
+
 export default function HealthSection({ days }: { days: number }) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [strava, setStrava] = useState<StravaStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   function reload() {
     setLoading(true);
@@ -219,6 +246,17 @@ export default function HealthSection({ days }: { days: number }) {
     fetch("/api/health/ingest")
       .then((r) => r.json())
       .then((d) => setLastSync(d.lastSync ?? null));
+    fetch("/api/strava/status")
+      .then((r) => r.json())
+      .then((d) => setStrava(d))
+      .catch(() => {});
+  }
+
+  async function syncStrava() {
+    setSyncing(true);
+    await fetch("/api/strava/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 30 }) });
+    await fetch("/api/strava/status").then(r => r.json()).then(d => setStrava(d));
+    setSyncing(false);
   }
 
   useEffect(() => { reload(); }, [days]);
@@ -230,9 +268,6 @@ export default function HealthSection({ days }: { days: number }) {
   const hrv = groupByDate(metrics, "hrv");
   const restingHr = groupByDate(metrics, "resting_hr");
   const sleep = groupByDate(metrics, "sleep_total");
-  const workoutRows = groupByDate(metrics, "workout");
-
-  const recentWorkouts = workoutRows.slice(0, 5);
 
   const daysSinceSync = lastSync
     ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
@@ -265,49 +300,83 @@ export default function HealthSection({ days }: { days: number }) {
 
       {/* Steps */}
       <div>
-        <h3 className="text-xs font-medium text-zinc-400 mb-2">Steps</h3>
+        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Steps</h3>
         <MiniChart data={steps} color="#10b981" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" days={days} />
       </div>
 
       {/* HRV */}
       <div>
-        <h3 className="text-xs font-medium text-zinc-400 mb-2">HRV</h3>
+        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>HRV</h3>
         <MiniChart data={hrv} color="#6366f1" unit="ms" gradientId="hrv-grad" days={days} />
       </div>
 
       {/* Resting HR */}
       <div>
-        <h3 className="text-xs font-medium text-zinc-400 mb-2">Resting Heart Rate</h3>
+        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Resting Heart Rate</h3>
         <MiniChart data={restingHr} color="#ec4899" unit="bpm" gradientId="hr-grad" days={days} />
       </div>
 
       {/* Sleep */}
       <div>
-        <h3 className="text-xs font-medium text-zinc-400 mb-2">Sleep · Deep / REM / Core</h3>
+        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Sleep · Deep / REM / Core</h3>
         <SleepBar data={sleep} days={days} />
       </div>
 
-      {/* Recent workouts */}
-      {recentWorkouts.length > 0 && (
-        <div>
-          <h3 className="text-xs font-medium text-zinc-400 mb-2">Recent workouts</h3>
-          <div className="space-y-1">
-            {recentWorkouts.map((w) => {
-              const mins = Math.round(w.value / 60);
-              const name = (w.metadata as { name?: string })?.name ?? "Workout";
+      {/* Strava workouts */}
+      <div style={{ borderTop: "1px solid var(--divider)", paddingTop: "1.25rem" }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+            🧡 Strava Workouts
+          </h3>
+          {strava?.connected ? (
+            <div className="flex items-center gap-2">
+              {strava.athleteName && (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>{strava.athleteName}</span>
+              )}
+              <button
+                onClick={syncStrava}
+                disabled={syncing}
+                className="text-xs px-2.5 py-1 rounded-lg transition-all disabled:opacity-40"
+                style={{ background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }}
+              >
+                {syncing ? "Syncing…" : "↻ Sync"}
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/api/strava/auth"
+              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all"
+              style={{ background: "rgba(252,76,2,0.15)", color: "#fc4c02", border: "1px solid rgba(252,76,2,0.3)" }}
+            >
+              Connect Strava
+            </a>
+          )}
+        </div>
+
+        {strava?.connected && strava.workouts?.length ? (
+          <div className="space-y-0">
+            {strava.workouts.map((w, i) => {
+              const mins = Math.round(w.durationSecs / 60);
+              const km = w.distanceMeters ? (w.distanceMeters / 1000).toFixed(1) : null;
+              const emoji = SPORT_EMOJI[w.sportType] ?? "💪";
               return (
-                <div key={w.id} className="flex justify-between text-sm py-1 border-b border-zinc-800">
-                  <span className="text-zinc-300">{name}</span>
-                  <span className="text-zinc-500">{format(parseISO(w.date), "MMM d")} · {mins} min</span>
+                <div key={w.id} className={`flex items-center gap-3 py-2.5 ${i < strava.workouts!.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--divider)" }}>
+                  <span className="text-lg flex-shrink-0">{emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>{w.name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {format(parseISO(w.date), "MMM d")} · {mins} min{km ? ` · ${km} km` : ""}{w.avgHeartrate ? ` · ${Math.round(w.avgHeartrate)} bpm` : ""}
+                    </p>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
-
-      <div className="mt-4 pt-4 border-t border-white/5 text-center">
-        <p className="text-[10px] text-zinc-600">Missing data? Add metrics in <span className="text-indigo-400">Settings → Uploads</span></p>
+        ) : strava?.connected ? (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>No recent workouts — tap Sync to load.</p>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Connect your Strava account to see workouts here.</p>
+        )}
       </div>
     </div>
   );
