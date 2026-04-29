@@ -259,6 +259,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
   const [tab, setTab] = useState<Tab>("Home");
   const [days, setDays] = useState<Range>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [entryLimit, setEntryLimit] = useState(15);
   const [profile, setProfile] = useState<{ name?: string; photo?: string } | null>(null);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
@@ -493,33 +494,45 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
             </section>
 
             <section className="glass rounded-2xl p-4">
-              <div className="flex justify-between items-center mb-3">
-                {selectedDate ? (
-                  <>
-                    <div>
-                      <h2 className="font-semibold">Week of {format(parseISO(selectedDate), "MMM d")}</h2>
-                      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>Scores shown are daily, not averaged</p>
-                    </div>
+              <div className="flex justify-between items-center mb-3 gap-2">
+                <h2 className="font-semibold">
+                  {dateFilter
+                    ? format(parseISO(dateFilter), "MMMM d, yyyy")
+                    : selectedDate
+                      ? `Week of ${format(parseISO(selectedDate), "MMM d")}`
+                      : "Entries"}
+                </h2>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {(dateFilter || selectedDate) && (
                     <button
-                      onClick={() => { setSelectedDate(null); setEntryLimit(15); }}
-                      className="text-xs px-2.5 py-1 rounded-lg"
+                      onClick={() => { setDateFilter(null); setSelectedDate(null); setEntryLimit(15); }}
+                      className="text-xs px-2 py-1 rounded-lg"
                       style={{ background: "var(--surface)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
-                    >
-                      ✕ Clear
-                    </button>
-                  </>
-                ) : (
-                  <h2 className="font-semibold">Recent entries</h2>
-                )}
+                    >✕</button>
+                  )}
+                  <input
+                    type="date"
+                    value={dateFilter ?? ""}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => { setDateFilter(e.target.value || null); setSelectedDate(null); setEntryLimit(15); }}
+                    className="text-xs rounded-lg px-2 py-1 focus:outline-none"
+                    style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: dateFilter ? "var(--text)" : "var(--text-muted)" }}
+                  />
+                </div>
               </div>
               {(() => {
-                const visible = weekEntries.slice(0, selectedDate ? weekEntries.length : entryLimit);
-                const hasMore = !selectedDate && weekEntries.length > entryLimit;
+                const baseEntries = dateFilter
+                  ? entries.filter(e => e.date === dateFilter)
+                  : weekEntries;
+                const visible = dateFilter || selectedDate
+                  ? baseEntries
+                  : baseEntries.slice(0, entryLimit);
+                const hasMore = !dateFilter && !selectedDate && baseEntries.length > entryLimit;
                 return (
                   <>
                     <div className="space-y-0">
                       {visible.length === 0 ? (
-                        <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>No entries for this period</p>
+                        <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>No entries for this date</p>
                       ) : visible.map((e, i) => (
                         <Link key={e.id} href={`/entries/${e.id}`} className={`flex items-start gap-3 py-3 -mx-1 px-1 rounded-xl transition-colors ${i < visible.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--divider)" }}>
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 mt-0.5" style={{ backgroundColor: MOOD_COLORS[e.mood] + "22" }}>
@@ -544,7 +557,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                         className="w-full mt-3 py-2 text-xs rounded-xl transition-all"
                         style={{ background: "var(--surface)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
                       >
-                        Show more ({weekEntries.length - entryLimit} remaining)
+                        Show more ({baseEntries.length - entryLimit} remaining)
                       </button>
                     )}
                   </>
