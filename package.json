@@ -19,6 +19,7 @@
     "@auth/drizzle-adapter": "^1.11.2",
     "@neondatabase/serverless": "^1.1.0",
     "@types/sax": "^1.2.7",
+    "@types/web-push": "^3.6.4",
     "date-fns": "^4.1.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
@@ -29,6 +30,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
     "sax": "^1.6.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

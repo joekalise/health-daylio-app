@@ -91,6 +91,14 @@ export const workouts = pgTable("workouts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User profile for personalising Claude's responses
 export const userProfile = pgTable("user_profile", {
   id: serial("id").primaryKey(),

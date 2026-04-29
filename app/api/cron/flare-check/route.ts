@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { moodEntries } from "@/db/schema";
+import { desc } from "drizzle-orm";
+import { sendToAll } from "@/lib/push";
+import { subDays } from "date-fns";
+
+export const maxDuration = 30;
+
+export async function GET(req: NextRequest) {
+  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const entries = await db.select().from(moodEntries).orderBy(desc(moodEntries.date)).limit(90);
+  if (entries.length < 7) return NextResponse.json({ skipped: true, reason: "not enough data" });
+
+  const now = new Date();
+  const d = (n: number) => subDays(now, n).toISOString().split("T")[0];
+
+  const last3 = entries.filter(e => e.date >= d(3));
+  const last7 = entries.filter(e => e.date >= d(7));
+  const baseline = entries.filter(e => e.date >= d(90));
+
+  const avg = (arr: typeof entries) => arr.length ? arr.reduce((s, e) => s + e.moodScore, 0) / arr.length : null;
+  const hasActivity = (arr: typeof entries, act: string) => arr.some(e => e.activities?.includes(act));
+
+  const baselineAvg = avg(baseline) ?? 3.5;
+  const recent3Avg = avg(last3);
+
+  const reasons: string[] = [];
+  if (hasActivity(last7, "sick")) reasons.push("illness logged");
+  const badSleep = last7.filter(e => e.activities?.some(a => ["bad sleep", "medium sleep"].includes(a)));
+  if (badSleep.length >= 3) reasons.push(`${badSleep.length} nights poor sleep`);
+  if (recent3Avg !== null && recent3Avg < baselineAvg - 0.8) reasons.push("mood notably below your normal");
+  if (hasActivity(last7, "anxiety attack")) reasons.push("anxiety logged this week");
+
+  if (reasons.length === 0) return NextResponse.json({ ok: true, flare: false });
+
+  const isHigh = reasons.length >= 3;
+  await sendToAll({
+    title: isHigh ? "⚠️ AS flare risk: High" : "⚠️ AS flare warning",
+    body: reasons.slice(0, 2).join(", ") + ". Open the app to see details.",
+    url: "/dashboard",
+    tag: "flare-warning",
+  });
+
+  return NextResponse.json({ ok: true, flare: true, reasons });
+}

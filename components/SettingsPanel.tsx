@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import ProfileSection from "./ProfileSection";
 
-type Tab = "profile" | "budget" | "fire";
+type Tab = "profile" | "budget" | "fire" | "notifications";
 
 // ── Budget tab ────────────────────────────────────────────────────────────────
 interface Entry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
@@ -220,11 +220,96 @@ function FireTab() {
   );
 }
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+function NotificationsSection() {
+  const [status, setStatus] = useState<"unknown" | "unsupported" | "granted" | "denied" | "default">("unknown");
+  const [subscribing, setSubscribing] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      setStatus("unsupported");
+    } else {
+      setStatus(Notification.permission as typeof status);
+    }
+  }, []);
+
+  async function enable() {
+    setSubscribing(true);
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const permission = await Notification.requestPermission();
+      setStatus(permission as typeof status);
+      if (permission !== "granted") { setSubscribing(false); return; }
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub),
+      });
+      setDone(true);
+    } catch (e) {
+      console.error("Push subscribe failed:", e);
+    }
+    setSubscribing(false);
+  }
+
+  if (status === "unsupported") return (
+    <p className="text-xs" style={{ color: "var(--text-muted)" }}>Push notifications aren't supported in this browser.</p>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">🔔</span>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Daily mood reminder</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>8pm every day — only sent if you haven't logged yet</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>AS flare warnings</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Morning check — notified when your data shows early warning signs</p>
+          </div>
+        </div>
+      </div>
+
+      {status === "granted" ? (
+        <p className="text-xs text-center py-2" style={{ color: "var(--c-positive)" }}>
+          {done ? "✓ Subscribed — notifications are active" : "✓ Notifications already enabled"}
+        </p>
+      ) : status === "denied" ? (
+        <p className="text-xs text-center py-2" style={{ color: "var(--c-negative)" }}>
+          Notifications blocked — enable them in your browser settings
+        </p>
+      ) : (
+        <button
+          onClick={enable}
+          disabled={subscribing}
+          className="w-full py-3 rounded-2xl font-medium text-sm transition-all disabled:opacity-50"
+          style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}
+        >
+          {subscribing ? "Setting up…" : "Enable notifications"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main SettingsPanel ────────────────────────────────────────────────────────
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "profile", label: "Profile" },
   { id: "budget", label: "Budget" },
   { id: "fire", label: "FIRE" },
+  { id: "notifications", label: "Alerts" },
 ];
 
 export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (photo: string) => void }) {
@@ -250,6 +335,7 @@ export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (phot
       {tab === "profile" && <ProfileSection onPhotoChange={onPhotoChange} />}
       {tab === "budget" && <BudgetTab />}
       {tab === "fire" && <FireTab />}
+      {tab === "notifications" && <NotificationsSection />}
     </div>
   );
 }
