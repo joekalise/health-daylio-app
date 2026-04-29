@@ -18,26 +18,23 @@ export async function GET() {
   const cut30s = cut30.toISOString().split("T")[0];
   const todayS = today.toISOString().split("T")[0];
 
+  // Only fetch last 90 days of moods — no need for all-time
   const [moods, health, snapshot, accounts] = await Promise.all([
-    db.select().from(moodEntries).orderBy(desc(moodEntries.date)),
+    db.select().from(moodEntries).where(gte(moodEntries.date, cut90s)).orderBy(desc(moodEntries.date)),
     db.select().from(healthMetrics).where(gte(healthMetrics.date, cut90s)).orderBy(desc(healthMetrics.date)),
     db.select().from(financeSnapshots).orderBy(desc(financeSnapshots.importedAt)).limit(1),
     db.select().from(financeAccounts).where(eq(financeAccounts.isActive, true)),
   ]);
 
-  const recentMoods = moods.filter(m => m.date >= cut90s);
   const recent30Moods = moods.filter(m => m.date >= cut30s);
-  const prev30Moods = moods.filter(m => m.date >= cut90s && m.date < cut30s);
+  const prev30Moods = moods.filter(m => m.date < cut30s);
 
-  // Mood averages
   const avg = (arr: typeof moods) => arr.length ? arr.reduce((s, m) => s + m.moodScore, 0) / arr.length : null;
-  const overallAvg = avg(moods);
   const recent30Avg = avg(recent30Moods);
   const prev30Avg = avg(prev30Moods);
 
-  // Activity stats
   const actMap: Record<string, { total: number; count: number }> = {};
-  for (const m of recentMoods) {
+  for (const m of moods) {
     for (const a of (m.activities ?? [])) {
       if (!actMap[a]) actMap[a] = { total: 0, count: 0 };
       actMap[a].total += m.moodScore;
@@ -49,7 +46,6 @@ export async function GET() {
     .map(([name, v]) => ({ name, avg: +(v.total / v.count).toFixed(2), count: v.count }))
     .sort((a, b) => b.avg - a.avg);
 
-  // Health averages by type
   const healthByType: Record<string, number[]> = {};
   for (const h of health) {
     if (!healthByType[h.type]) healthByType[h.type] = [];
@@ -60,9 +56,8 @@ export async function GET() {
     healthAvgs[t] = (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1);
   }
 
-  // Day of week pattern
   const dowMap: Record<number, { total: number; count: number }> = {};
-  for (const m of recentMoods) {
+  for (const m of moods) {
     const dow = new Date(m.date + "T00:00:00").getDay();
     if (!dowMap[dow]) dowMap[dow] = { total: 0, count: 0 };
     dowMap[dow].total += m.moodScore;
@@ -71,21 +66,18 @@ export async function GET() {
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const dowStats = Object.entries(dowMap).map(([d, v]) => ({ day: DAYS[Number(d)], avg: +(v.total / v.count).toFixed(2) })).sort((a, b) => b.avg - a.avg);
 
-  // Mood distribution
   const dist: Record<string, number> = {};
-  for (const m of recentMoods) dist[m.mood] = (dist[m.mood] ?? 0) + 1;
+  for (const m of moods) dist[m.mood] = (dist[m.mood] ?? 0) + 1;
 
-  // Recent notes (for qualitative context)
   const recentNotes = moods.slice(0, 20).filter(m => m.note && m.note.length > 10).slice(0, 5).map(m => ({
-    date: m.date, mood: m.mood, note: m.note?.slice(0, 200),
+    date: m.date, mood: m.mood, note: m.note?.slice(0, 150),
   }));
 
-  // Finance
-  let budgetEntries: { name: string; value: number; category: string; type: string | null }[] = [];
+  let budgetEntries: { name: string; value: number; category: string }[] = [];
   let netWorthLatest: number | null = null;
   if (snapshot.length) {
     const entries = await db.select().from(financeEntries).where(eq(financeEntries.snapshotId, snapshot[0].id));
-    budgetEntries = entries.map(e => ({ name: e.name, value: e.value, category: e.category, type: (e.metadata as { type?: string } | null)?.type ?? null }));
+    budgetEntries = entries.map(e => ({ name: e.name, value: e.value, category: e.category }));
     const balances = await db.select().from(financeBalances).orderBy(desc(financeBalances.date));
     const netWorthIds = new Set(accounts.filter(a => a.isNetWorth).map(a => a.id));
     const latestByAccount: Record<number, number> = {};
@@ -94,14 +86,11 @@ export async function GET() {
   }
 
   const income = budgetEntries.filter(e => e.category === "income").reduce((s, e) => s + e.value, 0);
-  const savings = budgetEntries.filter(e => e.category === "expense" && e.type === "S").reduce((s, e) => s + e.value, 0);
-  const expenses = budgetEntries.filter(e => e.category === "expense" && e.type !== "S").reduce((s, e) => s + e.value, 0);
 
   const context = {
     today: todayS,
     mood: {
-      totalEntries: moods.length,
-      overallAvg: overallAvg?.toFixed(2),
+      last90DaysEntries: moods.length,
       recent30Avg: recent30Avg?.toFixed(2),
       prev30Avg: prev30Avg?.toFixed(2),
       trend: recent30Avg && prev30Avg ? (recent30Avg - prev30Avg).toFixed(2) : null,
@@ -119,40 +108,33 @@ export async function GET() {
     finance: {
       netWorth: netWorthLatest ? Math.round(netWorthLatest) : null,
       monthlyIncome: Math.round(income),
-      monthlyExpenses: Math.round(expenses),
-      monthlySavings: Math.round(savings),
-      savingsRate: income > 0 ? ((savings / income) * 100).toFixed(1) + "%" : null,
     },
   };
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5",
-    max_tokens: 1500,
-    system: `You are a perceptive personal analytics assistant for someone who has Ankylosing Spondylitis (AS), a chronic inflammatory arthritis condition. AS flares are triggered by poor sleep, stress, illness, inactivity, alcohol, and immune stress. Generate genuinely useful, specific insights from this user's life data. Be direct, concrete, and reference actual numbers. Surface non-obvious patterns. Look for AS flare precursors in the data — patterns of declining mood + poor sleep + no exercise are particularly important to flag. Look across mood, health, and finance for cross-domain insights.
-
-Return ONLY valid JSON in this exact structure:
-{
-  "summary": "2-sentence honest assessment of the user's current wellbeing trajectory",
-  "insights": [
-    {
-      "title": "Punchy 4-6 word title",
-      "body": "2-3 sentences. Specific numbers. What does this mean and what could they do about it?",
-      "category": "mood|health|finance|pattern",
-      "sentiment": "positive|neutral|negative"
-    }
-  ]
-}
-
-Generate 5-6 insights. Prioritise insights that are surprising, actionable, or cross-domain. Do not include markdown, code fences, or text outside the JSON object.`,
-    messages: [{ role: "user", content: JSON.stringify(context, null, 2) }],
-  });
-
-  const raw = response.content.find(b => b.type === "text")?.text ?? "{}";
   try {
-    const parsed = JSON.parse(raw);
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1200,
+      system: `You are a personal analytics assistant for someone with Ankylosing Spondylitis (AS). Generate specific, actionable insights from their life data. Reference actual numbers. Look for AS flare precursors (declining mood + poor sleep + no exercise). Cross-domain patterns are valuable.
+
+Return ONLY valid JSON (no markdown, no code fences):
+{"summary":"2-sentence honest assessment","insights":[{"title":"4-6 word title","body":"2-3 sentences with specific numbers and what to do","category":"mood|health|finance|pattern","sentiment":"positive|neutral|negative"}]}
+
+Generate 4-5 insights.`,
+      messages: [{ role: "user", content: JSON.stringify(context) }],
+    });
+
+    const raw = response.content.find(b => b.type === "text")?.text ?? "{}";
+    // Strip any accidental markdown fences
+    const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    const parsed = JSON.parse(cleaned);
     return NextResponse.json({ ...parsed, generatedAt: new Date().toISOString() });
-  } catch {
-    return NextResponse.json({ error: "Parse failed", raw }, { status: 500 });
+  } catch (err) {
+    console.error("[insights] Claude error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Claude call failed" },
+      { status: 500 }
+    );
   }
 }
