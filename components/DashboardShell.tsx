@@ -436,7 +436,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                       <>
                         <p className="text-xs" style={{ color: "var(--text-dim)" }}>Net Worth</p>
                         <p className="text-lg font-bold" style={{ color: "var(--c-positive)" }}>
-                          £{homeSummary.finance.netWorth.toLocaleString()}
+                          {new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(homeSummary.finance.netWorth)}
                         </p>
                       </>
                     ) : (
