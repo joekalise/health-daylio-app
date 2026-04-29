@@ -2,17 +2,21 @@ import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
+function getWebPush() {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!,
+  );
+  return webpush;
+}
 
 export async function sendToAll(payload: { title: string; body: string; url?: string; tag?: string }) {
+  const wp = getWebPush();
   const subs = await db.select().from(pushSubscriptions);
   const results = await Promise.allSettled(
     subs.map((s) =>
-      webpush.sendNotification(
+      wp.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         JSON.stringify(payload),
       )
