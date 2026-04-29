@@ -88,7 +88,7 @@ export default function ChatPanel() {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 400 }}>
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 220px)", minHeight: 400 }}>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-2 space-y-4 pr-1">
         {messages.length === 0 && (
@@ -114,7 +114,7 @@ export default function ChatPanel() {
                 m.role === "user" ? "rounded-br-sm" : "rounded-bl-sm"
               }`}
               style={m.role === "user"
-                ? { background: "rgba(99,102,241,0.7)", color: "#fff" }
+                ? { background: "var(--c-primary)", color: "#fff" }
                 : { background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }
               }
             >
@@ -156,7 +156,7 @@ export default function ChatPanel() {
           onClick={() => send(input)}
           disabled={!input.trim() || loading}
           className="px-3 py-2 rounded-xl text-sm transition-all disabled:opacity-40 flex-shrink-0"
-          style={{ background: "rgba(99,102,241,0.4)", border: "1px solid rgba(99,102,241,0.5)" }}
+          style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}
         >
           ↑
         </button>

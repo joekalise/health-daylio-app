@@ -378,7 +378,7 @@ export default function FinanceSection() {
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Account Balances</h3>
           {!editing ? (
-            <button onClick={startEditing} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Update</button>
+            <button onClick={startEditing} className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all" style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}>Update</button>
           ) : (
             <div className="flex gap-3">
               <button onClick={() => setEditing(false)} className="text-xs" style={{ color: "var(--text-muted)" }}>Cancel</button>

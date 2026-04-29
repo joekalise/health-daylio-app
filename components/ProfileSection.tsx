@@ -25,15 +25,26 @@ function Field({ label, hint, value, onChange, multiline }: {
   label: string; hint?: string; value: string;
   onChange: (v: string) => void; multiline?: boolean;
 }) {
-  const base = "w-full glass rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-colors";
   return (
     <div>
-      <label className="text-xs text-zinc-400 block mb-1">{label}</label>
-      {hint && <p className="text-xs text-zinc-600 mb-1.5">{hint}</p>}
+      <label className="text-xs block mb-1 font-medium" style={{ color: "var(--text-dim)" }}>{label}</label>
+      {hint && <p className="text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>{hint}</p>}
       {multiline ? (
-        <textarea rows={3} className={`${base} resize-none`} value={value} onChange={(e) => onChange(e.target.value)} />
+        <textarea
+          rows={3}
+          className="w-full glass rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none transition-colors"
+          style={{ color: "var(--text)", background: "var(--input-bg)", border: "1px solid var(--chip-border)" }}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
       ) : (
-        <input type="text" className={base} value={value} onChange={(e) => onChange(e.target.value)} />
+        <input
+          type="text"
+          className="w-full glass rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-colors"
+          style={{ color: "var(--text)", background: "var(--input-bg)", border: "1px solid var(--chip-border)" }}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
       )}
     </div>
   );
@@ -100,7 +111,7 @@ export default function ProfileSection({ onPhotoChange }: { onPhotoChange?: (pho
     setTimeout(() => setSaved(false), 2000);
   }
 
-  if (loading) return <p className="text-zinc-500 text-sm text-center py-8">Loading...</p>;
+  if (loading) return <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
   return (
     <div className="space-y-5">
@@ -108,8 +119,8 @@ export default function ProfileSection({ onPhotoChange }: { onPhotoChange?: (pho
       <div className="flex items-center gap-4">
         <button
           onClick={() => fileRef.current?.click()}
-          className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 hover:border-indigo-500/50 transition-all flex-shrink-0 group"
-          style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+          className="relative w-20 h-20 rounded-full overflow-hidden border-2 transition-all flex-shrink-0 group"
+          style={{ background: "linear-gradient(135deg, var(--c-primary), var(--c-secondary))", borderColor: "var(--border)" }}
         >
           {profile.photo ? (
             <img src={profile.photo} alt="profile" className="w-full h-full object-cover" />
@@ -118,21 +129,21 @@ export default function ProfileSection({ onPhotoChange }: { onPhotoChange?: (pho
               {profile.name ? profile.name[0].toUpperCase() : "?"}
             </span>
           )}
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-xs text-white">Upload</span>
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-xs text-white font-medium">Change</span>
           </div>
         </button>
         <div>
-          <p className="text-sm font-medium text-zinc-200">{profile.name || "Add your name"}</p>
-          <button onClick={() => fileRef.current?.click()} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors mt-0.5">
+          <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{profile.name || "Add your name"}</p>
+          <button onClick={() => fileRef.current?.click()} className="text-xs mt-1 transition-colors" style={{ color: "var(--c-primary)" }}>
             Change photo
           </button>
         </div>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
       </div>
 
-      <p className="text-xs text-zinc-500 leading-relaxed">
-        This is shared with the AI chatbot to personalise its responses — health conditions, goals, and context that would otherwise need explaining every time.
+      <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+        Shared with the AI chat to personalise responses — health conditions, goals, and context that would otherwise need explaining every time.
       </p>
 
       <div className="grid grid-cols-2 gap-3">
@@ -145,51 +156,20 @@ export default function ProfileSection({ onPhotoChange }: { onPhotoChange?: (pho
         <Field label="Location" value={profile.location ?? ""} onChange={(v) => set("location", v)} />
       </div>
 
-      <Field
-        label="Health conditions"
-        hint="Chronic illness, diagnoses, anything relevant to your health data"
-        value={profile.healthConditions ?? ""}
-        onChange={(v) => set("healthConditions", v)}
-        multiline
-      />
-
-      <Field
-        label="Medications & supplements"
-        hint="Helps contextualise HRV, sleep, and mood patterns"
-        value={profile.medications ?? ""}
-        onChange={(v) => set("medications", v)}
-        multiline
-      />
-
-      <Field
-        label="Fitness goals"
-        hint="e.g. improve HRV, run 5k, lose weight"
-        value={profile.fitnessGoals ?? ""}
-        onChange={(v) => set("fitnessGoals", v)}
-        multiline
-      />
-
-      <Field
-        label="Financial goals"
-        hint="e.g. retire early, build emergency fund, pay off debt"
-        value={profile.financialGoals ?? ""}
-        onChange={(v) => set("financialGoals", v)}
-        multiline
-      />
-
-      <Field
-        label="About you"
-        hint="Anything else — family situation, lifestyle, context the chatbot should know"
-        value={profile.about ?? ""}
-        onChange={(v) => set("about", v)}
-        multiline
-      />
+      <Field label="Health conditions" hint="Chronic illness, diagnoses, anything relevant to your health data" value={profile.healthConditions ?? ""} onChange={(v) => set("healthConditions", v)} multiline />
+      <Field label="Medications & supplements" hint="Helps contextualise HRV, sleep, and mood patterns" value={profile.medications ?? ""} onChange={(v) => set("medications", v)} multiline />
+      <Field label="Fitness goals" hint="e.g. improve HRV, run 5k, lose weight" value={profile.fitnessGoals ?? ""} onChange={(v) => set("fitnessGoals", v)} multiline />
+      <Field label="Financial goals" hint="e.g. retire early, build emergency fund, pay off debt" value={profile.financialGoals ?? ""} onChange={(v) => set("financialGoals", v)} multiline />
+      <Field label="About you" hint="Anything else — family situation, lifestyle, context the chatbot should know" value={profile.about ?? ""} onChange={(v) => set("about", v)} multiline />
 
       <button
         onClick={save}
         disabled={saving}
-        className="w-full py-3 rounded-2xl font-medium text-sm transition-all disabled:opacity-50"
-        style={{ background: saved ? "rgba(34,197,94,0.2)" : "rgba(99,102,241,0.3)", border: `1px solid ${saved ? "rgba(34,197,94,0.4)" : "rgba(99,102,241,0.4)"}`, color: saved ? "#86efac" : "#a5b4fc" }}
+        className="w-full py-3 rounded-2xl font-semibold text-sm transition-all disabled:opacity-50"
+        style={saved
+          ? { background: "var(--c-positive-dim)", border: "1px solid var(--c-positive-border)", color: "var(--c-positive)" }
+          : { background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }
+        }
       >
         {saving ? "Saving..." : saved ? "Saved ✓" : "Save profile"}
       </button>

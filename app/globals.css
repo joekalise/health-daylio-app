@@ -3,47 +3,55 @@
 :root {
   /* Structural */
   --bg: #07070f;
-  --bg-grad-1: rgba(99,102,241,0.10);
-  --bg-grad-2: rgba(139,92,246,0.07);
-  --surface: rgba(255,255,255,0.04);
-  --border: rgba(255,255,255,0.08);
+  --bg-grad-1: rgba(99,102,241,0.12);
+  --bg-grad-2: rgba(139,92,246,0.08);
+  --bg-grad-3: rgba(236,72,153,0.05);
+  --surface: rgba(255,255,255,0.06);
+  --surface-raised: rgba(255,255,255,0.09);
+  --border: rgba(255,255,255,0.10);
+  --divider: rgba(255,255,255,0.07);
+
+  /* Text hierarchy — light enough to actually read on dark bg */
   --text: #f4f4f5;
-  --text-dim: #71717a;
-  --text-muted: #52525b;
-  --nav-bg: rgba(7,7,15,0.88);
-  --nav-border: rgba(255,255,255,0.07);
-  --divider: rgba(255,255,255,0.05);
-  --chip-bg: rgba(255,255,255,0.07);
-  --chip-border: rgba(255,255,255,0.12);
-  --input-bg: rgba(255,255,255,0.06);
+  --text-dim: #a1a1aa;
+  --text-muted: #71717a;
+
+  /* Nav */
+  --nav-bg: rgba(7,7,15,0.92);
+  --nav-border: rgba(255,255,255,0.08);
+
+  /* Inputs / chips */
+  --chip-bg: rgba(255,255,255,0.08);
+  --chip-border: rgba(255,255,255,0.13);
+  --input-bg: rgba(255,255,255,0.07);
 
   /* Semantic palette */
-  --c-primary: #6366f1;
-  --c-primary-dim: rgba(99,102,241,0.15);
-  --c-primary-border: rgba(99,102,241,0.25);
-  --c-secondary: #8b5cf6;
-  --c-secondary-dim: rgba(139,92,246,0.15);
-  --c-secondary-border: rgba(139,92,246,0.25);
-  --c-positive: #10b981;
-  --c-positive-dim: rgba(16,185,129,0.15);
-  --c-positive-border: rgba(16,185,129,0.25);
-  --c-heart: #ec4899;
-  --c-heart-dim: rgba(236,72,153,0.15);
-  --c-heart-border: rgba(236,72,153,0.25);
-  --c-caution: #f59e0b;
-  --c-caution-dim: rgba(245,158,11,0.15);
-  --c-caution-border: rgba(245,158,11,0.25);
-  --c-negative: #f43f5e;
-  --c-negative-dim: rgba(244,63,94,0.15);
-  --c-negative-border: rgba(244,63,94,0.25);
+  --c-primary: #818cf8;
+  --c-primary-dim: rgba(129,140,248,0.15);
+  --c-primary-border: rgba(129,140,248,0.28);
+  --c-secondary: #a78bfa;
+  --c-secondary-dim: rgba(167,139,250,0.15);
+  --c-secondary-border: rgba(167,139,250,0.28);
+  --c-positive: #34d399;
+  --c-positive-dim: rgba(52,211,153,0.15);
+  --c-positive-border: rgba(52,211,153,0.28);
+  --c-heart: #f472b6;
+  --c-heart-dim: rgba(244,114,182,0.15);
+  --c-heart-border: rgba(244,114,182,0.28);
+  --c-caution: #fbbf24;
+  --c-caution-dim: rgba(251,191,36,0.15);
+  --c-caution-border: rgba(251,191,36,0.28);
+  --c-negative: #fb7185;
+  --c-negative-dim: rgba(251,113,133,0.15);
+  --c-negative-border: rgba(251,113,133,0.28);
 
   /* Stat cards */
-  --stat-bg-indigo: rgba(99,102,241,0.10);
-  --stat-border-indigo: rgba(99,102,241,0.22);
-  --stat-bg-violet: rgba(139,92,246,0.10);
-  --stat-border-violet: rgba(139,92,246,0.22);
-  --stat-bg-orange: rgba(249,115,22,0.10);
-  --stat-border-orange: rgba(249,115,22,0.22);
+  --stat-bg-indigo: rgba(129,140,248,0.10);
+  --stat-border-indigo: rgba(129,140,248,0.22);
+  --stat-bg-violet: rgba(167,139,250,0.10);
+  --stat-border-violet: rgba(167,139,250,0.22);
+  --stat-bg-orange: rgba(251,146,60,0.10);
+  --stat-border-orange: rgba(251,146,60,0.22);
 
   /* Charts */
   --chart-grid: #27272a;
@@ -55,37 +63,58 @@
 @media (prefers-color-scheme: light) {
   :root {
     --bg: #f4f4f8;
-    --bg-grad-1: rgba(99,102,241,0.05);
+    --bg-grad-1: rgba(99,102,241,0.06);
     --bg-grad-2: rgba(139,92,246,0.04);
-    --surface: rgba(255,255,255,0.9);
+    --bg-grad-3: rgba(236,72,153,0.03);
+    --surface: rgba(255,255,255,0.92);
+    --surface-raised: rgba(255,255,255,1);
     --border: rgba(0,0,0,0.09);
+    --divider: rgba(0,0,0,0.06);
     --text: #18181b;
     --text-dim: #52525b;
     --text-muted: #a1a1aa;
-    --nav-bg: rgba(244,244,248,0.92);
+    --nav-bg: rgba(244,244,248,0.94);
     --nav-border: rgba(0,0,0,0.08);
-    --divider: rgba(0,0,0,0.06);
     --chip-bg: rgba(0,0,0,0.06);
     --chip-border: rgba(0,0,0,0.10);
     --input-bg: rgba(0,0,0,0.04);
-    --chart-grid: #e4e4e7;
-    --chart-tick: #a1a1aa;
-    --tooltip-bg: #ffffff;
-    --tooltip-border: #e4e4e7;
+    --c-primary: #6366f1;
+    --c-primary-dim: rgba(99,102,241,0.10);
+    --c-primary-border: rgba(99,102,241,0.22);
+    --c-secondary: #8b5cf6;
+    --c-secondary-dim: rgba(139,92,246,0.10);
+    --c-secondary-border: rgba(139,92,246,0.22);
+    --c-positive: #10b981;
+    --c-positive-dim: rgba(16,185,129,0.10);
+    --c-positive-border: rgba(16,185,129,0.22);
+    --c-heart: #ec4899;
+    --c-heart-dim: rgba(236,72,153,0.10);
+    --c-heart-border: rgba(236,72,153,0.22);
+    --c-caution: #f59e0b;
+    --c-caution-dim: rgba(245,158,11,0.10);
+    --c-caution-border: rgba(245,158,11,0.22);
+    --c-negative: #f43f5e;
+    --c-negative-dim: rgba(244,63,94,0.10);
+    --c-negative-border: rgba(244,63,94,0.22);
     --stat-bg-indigo: rgba(99,102,241,0.08);
     --stat-border-indigo: rgba(99,102,241,0.18);
     --stat-bg-violet: rgba(139,92,246,0.08);
     --stat-border-violet: rgba(139,92,246,0.18);
     --stat-bg-orange: rgba(249,115,22,0.08);
     --stat-border-orange: rgba(249,115,22,0.18);
+    --chart-grid: #e4e4e7;
+    --chart-tick: #a1a1aa;
+    --tooltip-bg: #ffffff;
+    --tooltip-border: #e4e4e7;
   }
 }
 
 body {
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse at 15% 15%, var(--bg-grad-1) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, var(--bg-grad-2) 0%, transparent 55%);
+    radial-gradient(ellipse at 20% 10%, var(--bg-grad-1) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 90%, var(--bg-grad-2) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 10%, var(--bg-grad-3) 0%, transparent 50%);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -104,13 +133,13 @@ body {
 .glass {
   background: var(--surface);
   border: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-/* Gradient text — indigo/violet in light, white/gray in dark */
+/* Gradient text */
 .grad-text {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

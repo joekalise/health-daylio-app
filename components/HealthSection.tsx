@@ -220,8 +220,8 @@ export default function HealthSection({ days }: { days: number }) {
         </div>
       </div>
 
-      {/* Summary row */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* Summary row — 2×2 for readability on mobile */}
+      <div className="grid grid-cols-2 gap-2">
         <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="var(--c-positive)" />
         <StatCard label="Avg HRV" value={avg(hrv)?.toFixed(0) ?? null} unit="ms" color="var(--c-primary)" />
         <StatCard label="Resting HR" value={avg(restingHr)?.toFixed(0) ?? null} unit="bpm" color="var(--c-heart)" />
@@ -230,33 +230,34 @@ export default function HealthSection({ days }: { days: number }) {
 
       {/* Steps */}
       <div>
-        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Steps</h3>
-        <MiniChart data={steps} color="#10b981" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" days={days} />
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>Steps</h3>
+        <MiniChart data={steps} color="var(--c-positive)" unit="steps" formatter={(v) => (v / 1000).toFixed(1) + "k"} gradientId="steps-grad" days={days} />
       </div>
 
       {/* HRV */}
       <div>
-        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>HRV</h3>
-        <MiniChart data={hrv} color="#6366f1" unit="ms" gradientId="hrv-grad" days={days} />
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>HRV</h3>
+        <MiniChart data={hrv} color="var(--c-primary)" unit="ms" gradientId="hrv-grad" days={days} />
       </div>
 
       {/* Resting HR */}
       <div>
-        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Resting Heart Rate</h3>
-        <MiniChart data={restingHr} color="#ec4899" unit="bpm" gradientId="hr-grad" days={days} />
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>Resting Heart Rate</h3>
+        <MiniChart data={restingHr} color="var(--c-heart)" unit="bpm" gradientId="hr-grad" days={days} />
       </div>
 
       {/* Sleep */}
       <div>
-        <h3 className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Sleep · Deep / REM / Core</h3>
+        <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-dim)" }}>Sleep</h3>
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Deep · REM · Core</p>
         <SleepBar data={sleep} days={days} />
       </div>
 
       {/* Strava workouts */}
       <div style={{ borderTop: "1px solid var(--divider)", paddingTop: "1.25rem" }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
-            🧡 Strava Workouts
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-dim)" }}>
+            Workouts
           </h3>
           {strava?.connected ? (
             <div className="flex items-center gap-2">

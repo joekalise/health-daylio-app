@@ -69,7 +69,7 @@ function BudgetTab() {
     await load();
   }
 
-  if (loading) return <p className="text-zinc-500 text-sm text-center py-8">Loading...</p>;
+  if (loading) return <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
   const income = entries.filter(e => e.category === "income");
   const expenses = entries.filter(e => e.category === "expense");
@@ -81,16 +81,16 @@ function BudgetTab() {
   }
   const groupKeys = [...GROUP_ORDER.filter(g => grouped[g]), ...Object.keys(grouped).filter(g => !GROUP_ORDER.includes(g))];
 
-  const inputClass = "w-24 glass rounded-lg px-2 py-1 text-sm text-right text-white focus:outline-none focus:border-indigo-500/50 tabular-nums";
+  const inputClass = "w-24 glass rounded-lg px-2 py-1 text-sm text-right focus:outline-none tabular-nums";
 
   return (
     <div className="space-y-4">
       {/* Income */}
       <div>
-        <p className="text-[10px] uppercase tracking-widest text-emerald-500/70 mb-2">Income</p>
+        <p className="text-[10px] uppercase tracking-widest mb-2" style={{ color: "var(--c-positive)" }}>Income</p>
         {income.map(e => (
-          <div key={e.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-            <span className="text-sm text-zinc-300">{e.name}</span>
+          <div key={e.id} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--divider)" }}>
+            <span className="text-sm" style={{ color: "var(--text-dim)" }}>{e.name}</span>
             <input type="number" step="0.01" value={edits[e.id] ?? ""} onChange={ev => change(e.id, ev.target.value)} className={inputClass} />
           </div>
         ))}
@@ -99,18 +99,18 @@ function BudgetTab() {
       {/* Expense groups */}
       {groupKeys.map(group => (
         <div key={group}>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500/70 mb-2">{group}</p>
+          <p className="text-[10px] uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>{group}</p>
           {grouped[group].map(e => {
             const isSaving = (e.metadata as any)?.type === "S";
             return (
-              <div key={e.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 group">
+              <div key={e.id} className="flex items-center justify-between py-2 group" style={{ borderBottom: "1px solid var(--divider)" }}>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {isSaving && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-500" />}
-                  <span className="text-sm text-zinc-300 truncate">{e.name}</span>
+                  {isSaving && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "var(--c-secondary)" }} />}
+                  <span className="text-sm truncate" style={{ color: "var(--text-dim)" }}>{e.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="number" step="0.01" value={edits[e.id] ?? ""} onChange={ev => change(e.id, ev.target.value)} className={inputClass} />
-                  <button onClick={() => deleteEntry(e.id)} className="text-zinc-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs">✕</button>
+                  <button onClick={() => deleteEntry(e.id)} className="transition-colors opacity-0 group-hover:opacity-100 text-xs" style={{ color: "var(--text-muted)" }}>✕</button>
                 </div>
               </div>
             );
@@ -121,25 +121,25 @@ function BudgetTab() {
       {/* Add new */}
       {adding ? (
         <div className="glass rounded-xl p-3 space-y-2">
-          <input type="text" placeholder="Expense name" value={newItem.name} onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))} className="w-full glass rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+          <input type="text" placeholder="Expense name" value={newItem.name} onChange={e => setNewItem(p => ({ ...p, name: e.target.value }))} className="w-full glass rounded-lg px-3 py-2 text-sm focus:outline-none" style={{ color: "var(--text)" }} />
           <div className="flex gap-2">
-            <input type="number" placeholder="Monthly €" value={newItem.value} onChange={e => setNewItem(p => ({ ...p, value: e.target.value }))} className="flex-1 glass rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-            <select value={newItem.group} onChange={e => setNewItem(p => ({ ...p, group: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none bg-transparent">
-              {GROUP_ORDER.map(g => <option key={g} value={g} className="bg-zinc-900">{g}</option>)}
+            <input type="number" placeholder="Monthly €" value={newItem.value} onChange={e => setNewItem(p => ({ ...p, value: e.target.value }))} className="flex-1 glass rounded-lg px-3 py-2 text-sm focus:outline-none" style={{ color: "var(--text)" }} />
+            <select value={newItem.group} onChange={e => setNewItem(p => ({ ...p, group: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm focus:outline-none" style={{ color: "var(--text)", background: "var(--input-bg)" }}>
+              {GROUP_ORDER.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
-            <select value={newItem.type} onChange={e => setNewItem(p => ({ ...p, type: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm text-white focus:outline-none bg-transparent">
-              <option value="E" className="bg-zinc-900">Essential</option>
-              <option value="P" className="bg-zinc-900">Personal</option>
-              <option value="S" className="bg-zinc-900">Savings/Investment</option>
+            <select value={newItem.type} onChange={e => setNewItem(p => ({ ...p, type: e.target.value }))} className="flex-1 glass rounded-lg px-2 py-2 text-sm focus:outline-none" style={{ color: "var(--text)", background: "var(--input-bg)" }}>
+              <option value="E">Essential</option>
+              <option value="P">Personal</option>
+              <option value="S">Savings/Investment</option>
             </select>
-            <button onClick={() => setAdding(false)} className="flex-1 py-2 text-xs text-zinc-500 rounded-lg">Cancel</button>
-            <button onClick={addEntry} className="flex-1 py-2 text-xs text-indigo-300 rounded-lg" style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)" }}>Add</button>
+            <button onClick={() => setAdding(false)} className="flex-1 py-2 text-xs rounded-lg transition-colors" style={{ color: "var(--text-muted)" }}>Cancel</button>
+            <button onClick={addEntry} className="flex-1 py-2 text-xs rounded-lg" style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}>Add</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">+ Add expense</button>
+        <button onClick={() => setAdding(true)} className="text-xs transition-colors" style={{ color: "var(--text-muted)" }}>+ Add expense</button>
       )}
 
       <div className="flex gap-2 pt-2">
@@ -150,7 +150,7 @@ function BudgetTab() {
           </button>
         )}
       </div>
-      <p className="text-[10px] text-zinc-600 text-center">Purple dot = savings/investment. Hover a row to delete.</p>
+      <p className="text-[10px] text-center" style={{ color: "var(--text-muted)" }}>Purple dot = savings/investment. Hover a row to delete.</p>
     </div>
   );
 }
@@ -181,30 +181,30 @@ function FireTab() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const inputClass = "w-full glass rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none";
+  const inputClass = "w-full glass rounded-xl px-3 py-2.5 text-sm focus:outline-none";
 
   return (
     <div className="space-y-5">
-      <p className="text-xs text-zinc-500 leading-relaxed">
+      <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
         Configure how your FIRE progress is calculated. Changes apply the next time you open the Finance tab.
       </p>
 
       <div className="space-y-4">
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">Safe withdrawal rate multiplier</label>
-          <p className="text-[10px] text-zinc-600 mb-1.5">25× annual expenses = 4% SWR (standard). 33× = 3% SWR (more conservative).</p>
+          <label className="text-xs block mb-1" style={{ color: "var(--text-dim)" }}>Safe withdrawal rate multiplier</label>
+          <p className="text-[10px] mb-1.5" style={{ color: "var(--text-muted)" }}>25× annual expenses = 4% SWR (standard). 33× = 3% SWR (more conservative).</p>
           <input type="number" step="1" value={multiplier} onChange={e => setMultiplier(e.target.value)} className={inputClass} placeholder="25" />
         </div>
 
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">Expected annual return (%)</label>
-          <p className="text-[10px] text-zinc-600 mb-1.5">Historical global market average is ~7% inflation-adjusted.</p>
+          <label className="text-xs block mb-1" style={{ color: "var(--text-dim)" }}>Expected annual return (%)</label>
+          <p className="text-[10px] mb-1.5" style={{ color: "var(--text-muted)" }}>Historical global market average is ~7% inflation-adjusted.</p>
           <input type="number" step="0.5" value={annualReturn} onChange={e => setAnnualReturn(e.target.value)} className={inputClass} placeholder="7" />
         </div>
 
         <div>
-          <label className="text-xs text-zinc-400 block mb-1">Target retirement age (optional)</label>
-          <p className="text-[10px] text-zinc-600 mb-1.5">Shown alongside the years-to-FIRE estimate.</p>
+          <label className="text-xs block mb-1" style={{ color: "var(--text-dim)" }}>Target retirement age (optional)</label>
+          <p className="text-[10px] mb-1.5" style={{ color: "var(--text-muted)" }}>Shown alongside the years-to-FIRE estimate.</p>
           <input type="number" step="1" value={retireAge} onChange={e => setRetireAge(e.target.value)} className={inputClass} placeholder="e.g. 50" />
         </div>
       </div>
@@ -212,7 +212,10 @@ function FireTab() {
       <button
         onClick={save}
         className="w-full py-3 rounded-2xl font-medium text-sm transition-all"
-        style={{ background: saved ? "rgba(34,197,94,0.2)" : "rgba(99,102,241,0.3)", border: `1px solid ${saved ? "rgba(34,197,94,0.4)" : "rgba(99,102,241,0.4)"}`, color: saved ? "#86efac" : "#a5b4fc" }}
+        style={saved
+          ? { background: "var(--c-positive-dim)", border: "1px solid var(--c-positive-border)", color: "var(--c-positive)" }
+          : { background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }
+        }
       >
         {saved ? "Saved ✓" : "Save FIRE settings"}
       </button>
@@ -318,14 +321,16 @@ export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (phot
   return (
     <div>
       {/* Sub-nav */}
-      <div className="flex gap-1 mb-5 bg-white/5 rounded-xl p-1">
+      <div className="flex gap-1 mb-5 rounded-xl p-1" style={{ background: "var(--surface)" }}>
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              tab === t.id ? "bg-indigo-500/30 text-indigo-300" : "text-zinc-500 hover:text-zinc-300"
-            }`}
+            className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={tab === t.id
+              ? { background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }
+              : { color: "var(--text-muted)" }
+            }
           >
             {t.label}
           </button>
