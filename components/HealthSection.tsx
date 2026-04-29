@@ -201,6 +201,8 @@ export default function HealthSection({ days }: { days: number }) {
   const hrv = groupByDate(metrics, "hrv");
   const restingHr = groupByDate(metrics, "resting_hr");
   const sleep = groupByDate(metrics, "sleep_total");
+  const weight = groupByDate(metrics, "weight");
+  const bodyFat = groupByDate(metrics, "body_fat");
 
   const daysSinceSync = lastSync
     ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
@@ -252,6 +254,24 @@ export default function HealthSection({ days }: { days: number }) {
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Deep · REM · Core</p>
         <SleepBar data={sleep} days={days} />
       </div>
+
+      {/* Weight & Body Composition */}
+      {(weight.length > 0 || bodyFat.length > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          {weight.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>Weight</h3>
+              <MiniChart data={weight} color="var(--c-caution)" unit="kg" formatter={(v) => v.toFixed(1)} gradientId="weight-grad" days={days} />
+            </div>
+          )}
+          {bodyFat.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>Body Fat</h3>
+              <MiniChart data={bodyFat} color="var(--c-secondary)" unit="%" formatter={(v) => v.toFixed(1)} gradientId="bodyfat-grad" days={days} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Strava workouts */}
       <div style={{ borderTop: "1px solid var(--divider)", paddingTop: "1.25rem" }}>
