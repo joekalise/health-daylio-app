@@ -88,8 +88,8 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const result = await db.execute(
-    sql`SELECT type, MAX(date) as latest FROM health_metrics GROUP BY type ORDER BY latest DESC`
+    sql`SELECT MAX(created_at) as last_synced_at FROM health_metrics WHERE source = 'apple_health'`
   );
-  const latest = result.rows[0]?.latest as string | null;
-  return NextResponse.json({ lastSync: latest, byType: result.rows });
+  const lastSync = result.rows[0]?.last_synced_at as string | null;
+  return NextResponse.json({ lastSync });
 }
