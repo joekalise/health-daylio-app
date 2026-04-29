@@ -31,7 +31,7 @@ interface Props {
 }
 
 const TABS = [
-  { id: "Log", emoji: "✏️" },
+  { id: "Home", emoji: "🏠" },
   { id: "Mood", emoji: "😊" },
   { id: "Health", emoji: "💪" },
   { id: "Finance", emoji: "💰" },
@@ -250,15 +250,39 @@ function Avatar({ photo, name, onClick }: { photo?: string | null; name?: string
   );
 }
 
+interface HomeSummary {
+  health: { steps: number | null; hrv: number | null; sleep: number | null } | null;
+  finance: { netWorth: number | null } | null;
+}
+
 export default function DashboardShell({ entries, chartData, avgScore, streak, todayLogged }: Props) {
-  const [tab, setTab] = useState<Tab>(todayLogged ? "Mood" : "Log");
+  const [tab, setTab] = useState<Tab>("Home");
   const [days, setDays] = useState<Range>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [entryLimit, setEntryLimit] = useState(15);
   const [profile, setProfile] = useState<{ name?: string; photo?: string } | null>(null);
+  const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
 
   useEffect(() => {
     fetch("/api/profile").then(r => r.json()).then(d => { if (d) setProfile(d); });
+  }, []);
+
+  useEffect(() => {
+    const avgs = (arr: { value: number }[]) => arr.length ? arr.reduce((s, m) => s + m.value, 0) / arr.length : null;
+    Promise.all([
+      fetch("/api/health/metrics?days=14").then(r => r.json()).catch(() => []),
+      fetch("/api/finance/balances").then(r => r.json()).catch(() => ({})),
+    ]).then(([hm, fin]) => {
+      const steps = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "steps")) : null;
+      const hrv = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "hrv")) : null;
+      const sleep = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "sleep_total")) : null;
+      const history: { netWorth: number }[] = fin?.history ?? [];
+      const netWorth = history.length ? history[history.length - 1].netWorth : null;
+      setHomeSummary({
+        health: { steps: steps ? Math.round(steps) : null, hrv: hrv ? Math.round(hrv) : null, sleep: sleep ? +sleep.toFixed(1) : null },
+        finance: { netWorth: netWorth ? Math.round(netWorth) : null },
+      });
+    });
   }, []);
 
   const flareRisk = computeFlareRisk(entries);
@@ -291,7 +315,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
         </div>
 
         {/* Stats — only shown on mood-relevant tabs */}
-        {(tab === "Log" || tab === "Mood") && (
+        {(tab === "Home" || tab === "Mood") && (
           <div className="flex gap-2.5 mt-5">
             <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-indigo)", border: "1px solid var(--stat-border-indigo)" }}>
               <div className="text-xl font-bold text-indigo-500">{entries.length.toLocaleString()}</div>
@@ -310,40 +334,146 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-4">
-        {/* LOG TAB */}
-        {tab === "Log" && (
+        {/* HOME TAB — dashboard snapshot */}
+        {tab === "Home" && (
           <>
             {flareRisk && <FlareWarning risk={flareRisk} />}
-            {todayLogged ? (
-              <div className="glass rounded-2xl p-6 text-center space-y-3">
-                <div className="text-5xl">{MOOD_EMOJI[entries[0].mood]}</div>
-                <div>
-                  <p className="font-semibold capitalize text-lg" style={{ color: MOOD_COLORS[entries[0].mood] }}>{entries[0].mood}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Logged today</p>
-                </div>
-                {entries[0].activities && entries[0].activities.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 justify-center pt-1">
-                    {entries[0].activities.map((a) => (
-                      <span key={a} className="text-xs px-2.5 py-0.5 rounded-full" style={{ background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text-dim)" }}>{a}</span>
-                    ))}
+
+            {/* Today's mood */}
+            <section className="glass rounded-2xl p-5">
+              {todayLogged ? (
+                <div className="flex items-center gap-4">
+                  <div className="text-5xl">{MOOD_EMOJI[entries[0].mood]}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-lg capitalize" style={{ color: MOOD_COLORS[entries[0].mood] }}>{entries[0].mood}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Logged today</p>
+                    {entries[0].activities && entries[0].activities.length > 0 && (
+                      <p className="text-xs mt-1 truncate" style={{ color: "var(--text-dim)" }}>{entries[0].activities.slice(0, 4).join(" · ")}</p>
+                    )}
                   </div>
-                )}
-                <button onClick={() => setTab("Mood")} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                View all entries →
-                </button>
-              </div>
-            ) : (
-              <div className="glass rounded-2xl p-5 text-center">
-                <h2 className="font-semibold text-lg mb-4">How are you feeling?</h2>
-                <MoodLoggerWrapper onSavedTab={() => setTab("Mood")} />
-              </div>
+                  <button onClick={() => setTab("Mood")} className="text-xs flex-shrink-0 px-3 py-1.5 rounded-xl" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)" }}>View all →</button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Not logged today</p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Tap to log how you're feeling</p>
+                  </div>
+                  <button
+                    onClick={() => setTab("Mood")}
+                    className="px-4 py-2.5 rounded-xl text-sm font-medium flex-shrink-0"
+                    style={{ background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }}
+                  >
+                    ✏️ Log now
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* 7-day mini chart */}
+            {chartData.length > 0 && (
+              <section className="glass rounded-2xl p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="font-semibold text-sm">Mood · 7 days</h2>
+                  <button onClick={() => { setDays(7); setTab("Mood"); }} className="text-xs px-2 py-1 rounded-lg" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)" }}>Full view →</button>
+                </div>
+                <MoodChart
+                  data={chartData.filter(e => e.date >= subDays(new Date(), 7).toISOString().split("T")[0])}
+                  days={7}
+                />
+              </section>
             )}
+
+            {/* Health + Finance snapshot tiles */}
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setTab("Health")} className="glass rounded-2xl p-4 text-left transition-opacity active:opacity-70">
+                <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-muted)" }}>💪 Health · 14d avg</p>
+                {homeSummary?.health ? (
+                  <div className="space-y-2">
+                    {homeSummary.health.steps !== null && (
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs" style={{ color: "var(--text-dim)" }}>Steps</span>
+                        <span className="text-sm font-bold" style={{ color: "var(--c-positive)" }}>{homeSummary.health.steps.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {homeSummary.health.hrv !== null && (
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs" style={{ color: "var(--text-dim)" }}>HRV</span>
+                        <span className="text-sm font-bold" style={{ color: "var(--c-primary)" }}>{homeSummary.health.hrv} ms</span>
+                      </div>
+                    )}
+                    {homeSummary.health.sleep !== null && (
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs" style={{ color: "var(--text-dim)" }}>Sleep</span>
+                        <span className="text-sm font-bold" style={{ color: "var(--c-secondary)" }}>{homeSummary.health.sleep} hr</span>
+                      </div>
+                    )}
+                    {homeSummary.health.steps === null && homeSummary.health.hrv === null && homeSummary.health.sleep === null && (
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>No data yet</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>Loading…</p>
+                )}
+              </button>
+
+              <button onClick={() => setTab("Finance")} className="glass rounded-2xl p-4 text-left transition-opacity active:opacity-70">
+                <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-muted)" }}>💰 Finance</p>
+                {homeSummary?.finance ? (
+                  <div className="space-y-2">
+                    {homeSummary.finance.netWorth !== null ? (
+                      <>
+                        <p className="text-xs" style={{ color: "var(--text-dim)" }}>Net Worth</p>
+                        <p className="text-lg font-bold" style={{ color: "var(--c-positive)" }}>
+                          £{homeSummary.finance.netWorth.toLocaleString()}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>No data yet</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>Loading…</p>
+                )}
+              </button>
+            </div>
+
+            {/* Recent entries */}
+            <section className="glass rounded-2xl p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="font-semibold text-sm">Recent entries</h2>
+                <button onClick={() => setTab("Mood")} className="text-xs" style={{ color: "var(--c-primary)" }}>All →</button>
+              </div>
+              <div className="space-y-0">
+                {entries.slice(0, 5).map((e, i) => (
+                  <Link key={e.id} href={`/entries/${e.id}`} className={`flex items-center gap-3 py-2.5 -mx-1 px-1 rounded-xl ${i < 4 ? "border-b" : ""}`} style={{ borderColor: "var(--divider)" }}>
+                    <span className="text-xl">{MOOD_EMOJI[e.mood]}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium capitalize" style={{ color: MOOD_COLORS[e.mood] }}>{e.mood}</span>
+                        <span className="text-xs flex-shrink-0" style={{ color: "var(--text-muted)" }}>{relativeDate(e.date)}</span>
+                      </div>
+                      {e.activities && e.activities.length > 0 && (
+                        <p className="text-xs truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{e.activities.slice(0, 3).join(" · ")}</p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
           </>
         )}
 
         {/* MOOD TAB */}
         {tab === "Mood" && (
           <>
+            {!todayLogged && (
+              <section className="glass rounded-2xl p-5">
+                <h2 className="font-semibold text-lg mb-4 text-center">Log today's mood</h2>
+                <MoodLoggerWrapper />
+              </section>
+            )}
+
             <section className="glass rounded-2xl p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-semibold">Mood over time</h2>
@@ -483,7 +613,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               )}
               <span className={`text-xl transition-all ${tab === id ? "scale-110" : "opacity-50"}`}>{emoji}</span>
               <span className="text-[10px] font-medium tracking-wide" style={{ color: tab === id ? "var(--c-primary)" : "var(--text-muted)" }}>{id}</span>
-              {id === "Log" && !todayLogged && tab !== "Log" && (
+              {id === "Mood" && !todayLogged && tab !== "Mood" && (
                 <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full" style={{ background: "var(--c-primary)" }} />
               )}
             </button>

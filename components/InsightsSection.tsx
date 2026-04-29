@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
-import { parseISO, getDay, subDays, startOfWeek, addDays, format } from "date-fns";
+import { parseISO, getDay, subDays } from "date-fns";
 import { MOOD_COLORS } from "@/lib/mood";
 import { useChartTheme } from "@/lib/chartTheme";
 
@@ -50,7 +50,7 @@ const SENTIMENT_BG: Record<string, string> = {
   negative: "var(--c-negative-dim)",
 };
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MOOD_ORDER = ["rad", "good", "meh", "bad", "awful"] as const;
 
 function InsightCard({ insight }: { insight: Insight }) {
@@ -212,17 +212,25 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   for (const m of healthMetrics) {
     if (m.type === "sleep_total") sleepByDate[m.date] = m.value;
   }
-  const goodSleepMoods: number[] = [], poorSleepMoods: number[] = [];
+  const sleepMoodPairs: Array<{ hrs: number; mood: number }> = [];
   for (const e of entries) {
     const hrs = sleepByDate[e.date] ?? sleepByDate[subDays(parseISO(e.date), 1).toISOString().split("T")[0]];
-    if (hrs === undefined) continue;
-    if (hrs >= 7) goodSleepMoods.push(e.moodScore);
-    else poorSleepMoods.push(e.moodScore);
+    if (hrs === undefined || hrs <= 0) continue;
+    sleepMoodPairs.push({ hrs, mood: e.moodScore });
   }
   const avgArr = (a: number[]) => a.length ? +(a.reduce((s, v) => s + v, 0) / a.length).toFixed(2) : null;
-  const sleepCorr = goodSleepMoods.length >= 5 && poorSleepMoods.length >= 5
-    ? { good: avgArr(goodSleepMoods)!, poor: avgArr(poorSleepMoods)!, nGood: goodSleepMoods.length, nPoor: poorSleepMoods.length }
-    : null;
+  let sleepCorr: { good: number; poor: number; nGood: number; nPoor: number; threshold: number } | null = null;
+  if (sleepMoodPairs.length >= 10) {
+    const sorted = [...sleepMoodPairs].sort((a, b) => a.hrs - b.hrs);
+    const medianHrs = sorted[Math.floor(sorted.length / 2)].hrs;
+    const goodPairs = sleepMoodPairs.filter(p => p.hrs > medianHrs);
+    const poorPairs = sleepMoodPairs.filter(p => p.hrs <= medianHrs);
+    const goodAvg = avgArr(goodPairs.map(p => p.mood));
+    const poorAvg = avgArr(poorPairs.map(p => p.mood));
+    if (goodAvg !== null && poorAvg !== null) {
+      sleepCorr = { good: goodAvg, poor: poorAvg, nGood: goodPairs.length, nPoor: poorPairs.length, threshold: +medianHrs.toFixed(1) };
+    }
+  }
 
   // ── HRV trend (stress proxy) ──────────────────────────────────────────────────
   const d14 = subDays(now, 14).toISOString().split("T")[0];
@@ -234,18 +242,6 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   const hrvTrend = recentHrvAvg !== null && prevHrvAvg !== null
     ? { recent: recentHrvAvg, prev: prevHrvAvg, delta: +(recentHrvAvg - prevHrvAvg).toFixed(1) }
     : null;
-
-  // ── Weekly activity heatmap (last 5 weeks) ────────────────────────────────────
-  const KEY_ACTS = ["exercise", "good sleep", "bad sleep", "no alcohol", "anxiety attack", "sick"];
-  const recentWeeks = Array.from({ length: 5 }, (_, i) => {
-    const weekStart = startOfWeek(subDays(now, i * 7), { weekStartsOn: 1 });
-    const weekEnd = addDays(weekStart, 6);
-    const ws = weekStart.toISOString().split("T")[0];
-    const we = weekEnd.toISOString().split("T")[0];
-    const weekEntries = entries.filter(e => e.date >= ws && e.date <= we);
-    const logged = new Set(weekEntries.flatMap(e => e.activities ?? []));
-    return { label: format(weekStart, "MMM d"), logged };
-  }).reverse();
 
   return (
     <div className="space-y-5">
@@ -400,13 +396,13 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
               label="Sleep quality"
               high={sleepCorr.good}
               low={sleepCorr.poor}
-              highLabel={`≥7h (${sleepCorr.nGood} nights)`}
-              lowLabel={`<7h (${sleepCorr.nPoor} nights)`}
+              highLabel={`>${sleepCorr.threshold}h (${sleepCorr.nGood} nights)`}
+              lowLabel={`≤${sleepCorr.threshold}h (${sleepCorr.nPoor} nights)`}
             />
             <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
               {sleepCorr.good > sleepCorr.poor
-                ? `7h+ sleep is associated with +${(sleepCorr.good - sleepCorr.poor).toFixed(1)} pts better mood`
-                : "No significant mood boost from extra sleep in your data yet"}
+                ? `Sleeping more than ${sleepCorr.threshold}h is linked to +${(sleepCorr.good - sleepCorr.poor).toFixed(1)} pts better mood for you`
+                : `Short sleep nights (≤${sleepCorr.threshold}h) don't show a clear mood penalty in your data yet`}
             </p>
           </div>
         </div>
@@ -442,45 +438,6 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
         </div>
       )}
 
-      {/* Weekly activity heatmap */}
-      <div>
-        <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>Activity · Last 5 Weeks</p>
-        <div className="glass rounded-2xl p-4 overflow-x-auto">
-          <table className="w-full text-[10px]" style={{ borderCollapse: "separate", borderSpacing: "3px" }}>
-            <thead>
-              <tr>
-                <td className="pr-2" style={{ color: "var(--text-muted)", minWidth: 80 }}></td>
-                {recentWeeks.map(w => (
-                  <td key={w.label} className="text-center" style={{ color: "var(--text-muted)", minWidth: 36 }}>{w.label}</td>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {KEY_ACTS.map(act => {
-                const isAvoid = act.startsWith("no ");
-                return (
-                  <tr key={act}>
-                    <td className="pr-2 py-0.5 capitalize" style={{ color: "var(--text-dim)" }}>{act}</td>
-                    {recentWeeks.map(w => {
-                      const logged = w.logged.has(act);
-                      const positive = logged && !["bad sleep", "anxiety attack", "sick"].includes(act);
-                      const negative = logged && ["bad sleep", "anxiety attack", "sick"].includes(act);
-                      const bg = logged
-                        ? positive ? "var(--c-positive)" : negative ? "var(--c-negative)" : "var(--c-primary)"
-                        : "var(--divider)";
-                      return (
-                        <td key={w.label} className="text-center py-0.5">
-                          <div className="w-7 h-5 rounded mx-auto" style={{ background: bg, opacity: logged ? 0.85 : 0.3 }} title={logged ? `${act} logged` : "not logged"} />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

@@ -127,8 +127,8 @@ export async function GET() {
 
   const client = new Anthropic();
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2000,
+    model: "claude-haiku-4-5",
+    max_tokens: 1500,
     system: `You are a perceptive personal analytics assistant for someone who has Ankylosing Spondylitis (AS), a chronic inflammatory arthritis condition. AS flares are triggered by poor sleep, stress, illness, inactivity, alcohol, and immune stress. Generate genuinely useful, specific insights from this user's life data. Be direct, concrete, and reference actual numbers. Surface non-obvious patterns. Look for AS flare precursors in the data — patterns of declining mood + poor sleep + no exercise are particularly important to flag. Look across mood, health, and finance for cross-domain insights.
 
 Return ONLY valid JSON in this exact structure:
