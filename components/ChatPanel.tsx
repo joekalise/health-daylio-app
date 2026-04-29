@@ -93,12 +93,13 @@ export default function ChatPanel() {
       <div className="flex-1 overflow-y-auto py-2 space-y-4 pr-1">
         {messages.length === 0 && (
           <div className="space-y-2 mt-2">
-            <p className="text-xs text-zinc-500">Ask anything about your data:</p>
+            <p className="text-xs" style={{ color: "var(--text-dim)" }}>Ask anything about your data:</p>
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => send(s)}
-                className="block w-full text-left text-xs text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/8 rounded-xl px-3 py-2.5 transition-colors"
+                className="block w-full text-left text-xs rounded-xl px-3 py-2.5 transition-colors"
+                style={{ color: "var(--text)", background: "var(--chip-bg)", border: "1px solid var(--chip-border)" }}
               >
                 {s}
               </button>
@@ -110,16 +111,18 @@ export default function ChatPanel() {
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap leading-relaxed ${
-                m.role === "user"
-                  ? "bg-indigo-600/70 text-white rounded-br-sm"
-                  : "bg-white/5 border border-white/8 text-zinc-100 rounded-bl-sm"
+                m.role === "user" ? "rounded-br-sm" : "rounded-bl-sm"
               }`}
+              style={m.role === "user"
+                ? { background: "rgba(99,102,241,0.7)", color: "#fff" }
+                : { background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }
+              }
             >
               {m.content || (loading && i === messages.length - 1 ? (
                 <span className="inline-flex gap-1 py-0.5">
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "300ms" }} />
                 </span>
               ) : "")}
             </div>
@@ -129,11 +132,12 @@ export default function ChatPanel() {
       </div>
 
       {/* Input */}
-      <div className="pt-3 border-t border-white/8 flex gap-2 mt-2">
+      <div className="pt-3 flex gap-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
         {messages.length > 0 && (
           <button
             onClick={() => setMessages([])}
-            className="text-xs text-zinc-600 hover:text-zinc-400 px-2 py-2 flex-shrink-0 transition-colors"
+            className="text-xs px-2 py-2 flex-shrink-0 transition-colors"
+            style={{ color: "var(--text-muted)" }}
           >
             Clear
           </button>
@@ -145,7 +149,8 @@ export default function ChatPanel() {
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
           placeholder="Ask about your health & mood..."
           disabled={loading}
-          className="flex-1 glass rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
+          className="flex-1 glass rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-colors disabled:opacity-50"
+          style={{ color: "var(--text)", background: "var(--input-bg)", border: "1px solid var(--chip-border)" }}
         />
         <button
           onClick={() => send(input)}

@@ -42,6 +42,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [logDate, setLogDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const toggle = (a: string) =>
     setActivities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
@@ -49,11 +50,10 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   const save = async () => {
     if (!mood) return;
     setSaving(true);
-    const today = new Date().toISOString().split("T")[0];
     await fetch("/api/mood", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: today, mood, activities, note }),
+      body: JSON.stringify({ date: logDate, mood, activities, note }),
     });
     setSaved(true);
     setTimeout(() => {
@@ -77,6 +77,19 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="space-y-5 text-center">
+      {/* Date picker */}
+      <div className="flex items-center justify-center gap-2">
+        <label className="text-xs font-medium" style={{ color: "var(--text-dim)" }}>Logging for</label>
+        <input
+          type="date"
+          value={logDate}
+          max={new Date().toISOString().split("T")[0]}
+          onChange={(e) => setLogDate(e.target.value)}
+          className="text-xs rounded-lg px-2.5 py-1.5 focus:outline-none"
+          style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }}
+        />
+      </div>
+
       {/* Mood selector */}
       <div className="flex gap-2 justify-center">
         {MOODS.map((m) => (
@@ -98,7 +111,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
       <div className="space-y-4">
         {ACTIVITY_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-sm font-medium mb-2 text-center" style={{ color: "var(--text-dim)" }}>{group.label}</p>
+            <p className="text-base font-semibold mb-2 text-center" style={{ color: "var(--text)" }}>{group.label}</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {group.items.map((a) => (
                 <button

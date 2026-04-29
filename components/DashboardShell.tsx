@@ -31,7 +31,7 @@ interface Props {
 }
 
 const TABS = [
-  { id: "Today", emoji: "🌤️" },
+  { id: "Log", emoji: "✏️" },
   { id: "Mood", emoji: "😊" },
   { id: "Health", emoji: "💪" },
   { id: "Finance", emoji: "💰" },
@@ -40,27 +40,22 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]["id"] | "Profile";
 
-const RANGES = [30, 90, 180, 365, 1825] as const;
+const RANGES = [7, 30, 90, 180, 365, 1825] as const;
 type Range = typeof RANGES[number];
-const RANGE_LABELS: Record<Range, string> = { 30: "30d", 90: "90d", 180: "6m", 365: "1y", 1825: "All" };
+const RANGE_LABELS: Record<Range, string> = { 7: "7d", 30: "30d", 90: "90d", 180: "6m", 365: "1y", 1825: "All" };
 
 function RangePicker({ value, onChange }: { value: Range; onChange: (r: Range) => void }) {
   return (
-    <div className="flex gap-1">
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value) as Range)}
+      className="text-xs font-medium rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
+      style={{ background: "var(--surface)", color: "var(--text-dim)", border: "1px solid var(--border)" }}
+    >
       {RANGES.map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
-          style={value === r
-            ? { background: "var(--c-primary-dim)", color: "var(--c-primary)", border: "1px solid var(--c-primary-border)" }
-            : { color: "var(--text-muted)" }
-          }
-        >
-          {RANGE_LABELS[r]}
-        </button>
+        <option key={r} value={r}>{RANGE_LABELS[r]}</option>
       ))}
-    </div>
+    </select>
   );
 }
 
@@ -256,7 +251,7 @@ function Avatar({ photo, name, onClick }: { photo?: string | null; name?: string
 }
 
 export default function DashboardShell({ entries, chartData, avgScore, streak, todayLogged }: Props) {
-  const [tab, setTab] = useState<Tab>(todayLogged ? "Mood" : "Today");
+  const [tab, setTab] = useState<Tab>(todayLogged ? "Mood" : "Log");
   const [days, setDays] = useState<Range>(30);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [entryLimit, setEntryLimit] = useState(15);
@@ -296,7 +291,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
         </div>
 
         {/* Stats — only shown on mood-relevant tabs */}
-        {(tab === "Today" || tab === "Mood") && (
+        {(tab === "Log" || tab === "Mood") && (
           <div className="flex gap-2.5 mt-5">
             <div className="flex-1 rounded-2xl px-3 py-3 text-center" style={{ background: "var(--stat-bg-indigo)", border: "1px solid var(--stat-border-indigo)" }}>
               <div className="text-xl font-bold text-indigo-500">{entries.length.toLocaleString()}</div>
@@ -315,8 +310,8 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-4">
-        {/* TODAY TAB */}
-        {tab === "Today" && (
+        {/* LOG TAB */}
+        {tab === "Log" && (
           <>
             {flareRisk && <FlareWarning risk={flareRisk} />}
             {todayLogged ? (
@@ -334,7 +329,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                   </div>
                 )}
                 <button onClick={() => setTab("Mood")} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                  View all entries →
+                View all entries →
                 </button>
               </div>
             ) : (
@@ -488,7 +483,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               )}
               <span className={`text-xl transition-all ${tab === id ? "scale-110" : "opacity-50"}`}>{emoji}</span>
               <span className="text-[10px] font-medium tracking-wide" style={{ color: tab === id ? "var(--c-primary)" : "var(--text-muted)" }}>{id}</span>
-              {id === "Today" && !todayLogged && tab !== "Today" && (
+              {id === "Log" && !todayLogged && tab !== "Log" && (
                 <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full" style={{ background: "var(--c-primary)" }} />
               )}
             </button>

@@ -244,9 +244,9 @@ export default function HealthSection({ days }: { days: number }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${daysSinceSync === 0 ? "bg-emerald-400" : daysSinceSync !== null && daysSinceSync <= 1 ? "bg-yellow-400" : "bg-red-400"}`} />
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             {lastSync
-              ? daysSinceSync === 0 ? "Synced today" : `Last synced ${daysSinceSync}d ago`
+              ? format(new Date(lastSync), "d MMM · HH:mm")
               : "No sync data"}
           </span>
         </div>
