@@ -255,8 +255,13 @@ function Avatar({ photo, name, onClick }: { photo?: string | null; name?: string
   );
 }
 
+type Trend = { pct: number; positive: boolean } | null;
+
 interface HomeSummary {
-  health: { steps: number | null; hrv: number | null; sleep: number | null } | null;
+  health: {
+    steps: number | null; hrv: number | null; sleep: number | null;
+    trends: { steps: Trend; hrv: Trend; sleep: Trend };
+  } | null;
   finance: { netWorth: number | null } | null;
 }
 
@@ -268,24 +273,54 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
   const [entryLimit, setEntryLimit] = useState(15);
   const [profile, setProfile] = useState<{ name?: string; photo?: string } | null>(null);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   useEffect(() => {
     fetch("/api/profile").then(r => r.json()).then(d => { if (d) setProfile(d); });
   }, []);
 
   useEffect(() => {
-    const avgs = (arr: { value: number }[]) => arr.length ? arr.reduce((s, m) => s + m.value, 0) / arr.length : null;
+    const avg = (arr: { value: number; date: string }[]) => arr.length ? arr.reduce((s, m) => s + m.value, 0) / arr.length : null;
+    const trend = (arr: { value: number; date: string }[], higherIsBetter: boolean): Trend => {
+      const now = new Date();
+      const recent = arr.filter(m => m.date > subDays(now, 7).toISOString().split("T")[0]);
+      const prior = arr.filter(m => m.date > subDays(now, 14).toISOString().split("T")[0] && m.date <= subDays(now, 7).toISOString().split("T")[0]);
+      if (recent.length < 3 || prior.length < 3) return null;
+      const ra = avg(recent)!; const pa = avg(prior)!;
+      if (pa === 0) return null;
+      const pct = ((ra - pa) / pa) * 100;
+      return { pct, positive: higherIsBetter ? pct > 0 : pct < 0 };
+    };
     Promise.all([
-      fetch("/api/health/metrics?days=14").then(r => r.json()).catch(() => []),
+      fetch("/api/health/metrics?days=28").then(r => r.json()).catch(() => []),
       fetch("/api/finance/balances").then(r => r.json()).catch(() => ({})),
     ]).then(([hm, fin]) => {
-      const steps = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "steps")) : null;
-      const hrv = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "hrv")) : null;
-      const sleep = Array.isArray(hm) ? avgs(hm.filter((m: { type: string }) => m.type === "sleep_total")) : null;
+      const typed = Array.isArray(hm) ? hm as { type: string; value: number; date: string }[] : [];
+      const stepsData = typed.filter(m => m.type === "steps");
+      const hrvData = typed.filter(m => m.type === "hrv");
+      const sleepData = typed.filter(m => m.type === "sleep_total");
       const history: { netWorth: number }[] = fin?.history ?? [];
       const netWorth = history.length ? history[history.length - 1].netWorth : null;
+      const steps = avg(stepsData); const hrv = avg(hrvData); const sleep = avg(sleepData);
       setHomeSummary({
-        health: { steps: steps ? Math.round(steps) : null, hrv: hrv ? Math.round(hrv) : null, sleep: sleep ? +sleep.toFixed(1) : null },
+        health: {
+          steps: steps ? Math.round(steps) : null,
+          hrv: hrv ? Math.round(hrv) : null,
+          sleep: sleep ? +sleep.toFixed(1) : null,
+          trends: {
+            steps: trend(stepsData, true),
+            hrv: trend(hrvData, true),
+            sleep: trend(sleepData, true),
+          },
+        },
         finance: { netWorth: netWorth ? Math.round(netWorth) : null },
       });
     });
@@ -310,6 +345,11 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
 
   return (
     <div className="min-h-screen" style={{ color: "var(--text)", paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+      {offline && (
+        <div className="fixed top-0 inset-x-0 z-50 text-center text-xs py-2 font-medium" style={{ background: "var(--c-caution)", color: "#000" }}>
+          You&apos;re offline — showing cached data
+        </div>
+      )}
       {/* Header */}
       <header className="px-4 pb-2 max-w-2xl mx-auto" style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top, 0px))" }}>
         <div className="flex justify-between items-start">
@@ -399,21 +439,42 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                 {homeSummary?.health ? (
                   <div className="space-y-2">
                     {homeSummary.health.steps !== null && (
-                      <div className="flex justify-between items-baseline">
+                      <div className="flex justify-between items-center">
                         <span className="text-xs" style={{ color: "var(--text-dim)" }}>Steps</span>
-                        <span className="text-sm font-bold" style={{ color: "var(--c-positive)" }}>{homeSummary.health.steps.toLocaleString()}</span>
+                        <div className="flex items-center gap-1.5">
+                          {homeSummary.health.trends.steps && Math.abs(homeSummary.health.trends.steps.pct) >= 1 && (
+                            <span className="text-[10px] font-medium" style={{ color: homeSummary.health.trends.steps.positive ? "var(--c-positive)" : "var(--c-negative)" }}>
+                              {homeSummary.health.trends.steps.pct > 0 ? "↑" : "↓"}{Math.abs(homeSummary.health.trends.steps.pct).toFixed(0)}%
+                            </span>
+                          )}
+                          <span className="text-sm font-bold" style={{ color: "var(--c-positive)" }}>{homeSummary.health.steps.toLocaleString()}</span>
+                        </div>
                       </div>
                     )}
                     {homeSummary.health.hrv !== null && (
-                      <div className="flex justify-between items-baseline">
+                      <div className="flex justify-between items-center">
                         <span className="text-xs" style={{ color: "var(--text-dim)" }}>HRV</span>
-                        <span className="text-sm font-bold" style={{ color: "var(--c-primary)" }}>{homeSummary.health.hrv} ms</span>
+                        <div className="flex items-center gap-1.5">
+                          {homeSummary.health.trends.hrv && Math.abs(homeSummary.health.trends.hrv.pct) >= 1 && (
+                            <span className="text-[10px] font-medium" style={{ color: homeSummary.health.trends.hrv.positive ? "var(--c-positive)" : "var(--c-negative)" }}>
+                              {homeSummary.health.trends.hrv.pct > 0 ? "↑" : "↓"}{Math.abs(homeSummary.health.trends.hrv.pct).toFixed(0)}%
+                            </span>
+                          )}
+                          <span className="text-sm font-bold" style={{ color: "var(--c-primary)" }}>{homeSummary.health.hrv} ms</span>
+                        </div>
                       </div>
                     )}
                     {homeSummary.health.sleep !== null && (
-                      <div className="flex justify-between items-baseline">
+                      <div className="flex justify-between items-center">
                         <span className="text-xs" style={{ color: "var(--text-dim)" }}>Sleep</span>
-                        <span className="text-sm font-bold" style={{ color: "var(--c-secondary)" }}>{homeSummary.health.sleep} hr</span>
+                        <div className="flex items-center gap-1.5">
+                          {homeSummary.health.trends.sleep && Math.abs(homeSummary.health.trends.sleep.pct) >= 1 && (
+                            <span className="text-[10px] font-medium" style={{ color: homeSummary.health.trends.sleep.positive ? "var(--c-positive)" : "var(--c-negative)" }}>
+                              {homeSummary.health.trends.sleep.pct > 0 ? "↑" : "↓"}{Math.abs(homeSummary.health.trends.sleep.pct).toFixed(0)}%
+                            </span>
+                          )}
+                          <span className="text-sm font-bold" style={{ color: "var(--c-secondary)" }}>{homeSummary.health.sleep} hr</span>
+                        </div>
                       </div>
                     )}
                     {homeSummary.health.steps === null && homeSummary.health.hrv === null && homeSummary.health.sleep === null && (

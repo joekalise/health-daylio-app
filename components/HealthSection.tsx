@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
-import { format, parseISO, startOfWeek } from "date-fns";
+import { format, parseISO, startOfWeek, subDays } from "date-fns";
 import { useChartTheme } from "@/lib/chartTheme";
 
 function smooth(data: { date: string; value: number }[], days: number) {
@@ -53,6 +53,21 @@ function groupByDate(rows: Metric[], type: string) {
 function avg(rows: Metric[]) {
   if (!rows.length) return null;
   return rows.reduce((s, r) => s + r.value, 0) / rows.length;
+}
+
+function trendFor(rows: Metric[], higherIsBetter = true) {
+  const today = new Date();
+  const recent = rows.filter(r => parseISO(r.date) > subDays(today, 7));
+  const prior = rows.filter(r => {
+    const d = parseISO(r.date);
+    return d > subDays(today, 14) && d <= subDays(today, 7);
+  });
+  if (recent.length < 3 || prior.length < 3) return null;
+  const ra = recent.reduce((s, r) => s + r.value, 0) / recent.length;
+  const pa = prior.reduce((s, r) => s + r.value, 0) / prior.length;
+  if (pa === 0) return null;
+  const pct = ((ra - pa) / pa) * 100;
+  return { pct, positive: higherIsBetter ? pct > 0 : pct < 0 };
 }
 
 function MiniChart({ data, color, unit, formatter, gradientId, days }: {
@@ -120,12 +135,25 @@ function SleepBar({ data, days }: { data: Metric[]; days: number }) {
   );
 }
 
-function StatCard({ label, value, unit, color }: { label: string; value: string | null; unit: string; color: string }) {
+function Trend({ trend }: { trend: { pct: number; positive: boolean } | null }) {
+  if (!trend || Math.abs(trend.pct) < 1) return null;
+  return (
+    <div className="text-[10px] mt-1 font-medium" style={{ color: trend.positive ? "var(--c-positive)" : "var(--c-negative)" }}>
+      {trend.pct > 0 ? "↑" : "↓"} {Math.abs(trend.pct).toFixed(0)}% vs last week
+    </div>
+  );
+}
+
+function StatCard({ label, value, unit, color, trend }: {
+  label: string; value: string | null; unit: string; color: string;
+  trend?: { pct: number; positive: boolean } | null;
+}) {
   return (
     <div className="rounded-xl p-3 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
       <div className="text-xs mb-1" style={{ color: "var(--text-dim)" }}>{label}</div>
       <div className="font-bold text-lg" style={{ color }}>{value ?? "—"}</div>
       <div className="text-xs" style={{ color: "var(--text-dim)" }}>{unit}</div>
+      <Trend trend={trend ?? null} />
     </div>
   );
 }
@@ -224,10 +252,10 @@ export default function HealthSection({ days }: { days: number }) {
 
       {/* Summary row — 2×2 for readability on mobile */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="var(--c-positive)" />
-        <StatCard label="Avg HRV" value={avg(hrv)?.toFixed(0) ?? null} unit="ms" color="var(--c-primary)" />
-        <StatCard label="Resting HR" value={avg(restingHr)?.toFixed(0) ?? null} unit="bpm" color="var(--c-heart)" />
-        <StatCard label="Avg sleep" value={avg(sleep)?.toFixed(1) ?? null} unit="hr" color="var(--c-secondary)" />
+        <StatCard label="Avg steps" value={avg(steps)?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? null} unit="/ day" color="var(--c-positive)" trend={trendFor(steps, true)} />
+        <StatCard label="Avg HRV" value={avg(hrv)?.toFixed(0) ?? null} unit="ms" color="var(--c-primary)" trend={trendFor(hrv, true)} />
+        <StatCard label="Resting HR" value={avg(restingHr)?.toFixed(0) ?? null} unit="bpm" color="var(--c-heart)" trend={trendFor(restingHr, false)} />
+        <StatCard label="Avg sleep" value={avg(sleep)?.toFixed(1) ?? null} unit="hr" color="var(--c-secondary)" trend={trendFor(sleep, true)} />
       </div>
 
       {/* Steps */}
