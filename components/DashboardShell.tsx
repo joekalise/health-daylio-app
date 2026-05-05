@@ -9,6 +9,7 @@ import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
 import SettingsPanel from "./SettingsPanel";
 import ChatPanel from "./ChatPanel";
+import PainLogCard from "./PainLogCard";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays, addDays, startOfWeek } from "date-fns";
 import Link from "next/link";
@@ -414,6 +415,8 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                 </button>
               )}
             </section>
+
+            <PainLogCard />
 
             {/* 7-day mini chart */}
             {chartData.length > 0 && (

@@ -22,7 +22,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "query_health",
-    description: "Query health metrics. Types: steps, hrv, resting_hr, active_energy, sleep_total, workout, walking_distance, vo2max, weight, spo2.",
+    description: "Query health metrics. Types: steps, hrv, resting_hr, active_energy, sleep_total, workout, walking_distance, vo2max, weight, spo2, pain, stiffness. pain and stiffness are manually logged 0–10 daily scales.",
     input_schema: {
       type: "object" as const,
       properties: {
