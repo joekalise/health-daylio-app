@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const d = (n: number) => subDays(now, n).toISOString().split("T")[0];
 
-  const last3 = entries.filter(e => e.date >= d(3));
+  const last5 = entries.filter(e => e.date >= d(5));
   const last7 = entries.filter(e => e.date >= d(7));
   const baseline = entries.filter(e => e.date >= d(90));
 
@@ -26,13 +26,15 @@ export async function GET(req: NextRequest) {
   const hasActivity = (arr: typeof entries, act: string) => arr.some(e => e.activities?.includes(act));
 
   const baselineAvg = avg(baseline) ?? 3.5;
-  const recent3Avg = avg(last3);
+  const recent5Avg = avg(last5);
 
   const reasons: string[] = [];
   if (hasActivity(last7, "sick")) reasons.push("illness logged");
-  const badSleep = last7.filter(e => e.activities?.some(a => ["bad sleep", "medium sleep"].includes(a)));
-  if (badSleep.length >= 3) reasons.push(`${badSleep.length} nights poor sleep`);
-  if (recent3Avg !== null && recent3Avg < baselineAvg - 0.8) reasons.push("mood notably below your normal");
+  // 2 nights in 5 days catches the sleep deterioration ~2 days before a flare
+  const badSleep = last5.filter(e => e.activities?.some(a => ["bad sleep", "medium sleep"].includes(a)));
+  if (badSleep.length >= 2) reasons.push(`${badSleep.length} nights poor sleep`);
+  // Widened window and lower threshold to detect mood dip earlier
+  if (recent5Avg !== null && recent5Avg < baselineAvg - 0.5) reasons.push("mood dipping below your normal");
   if (hasActivity(last7, "anxiety attack")) reasons.push("anxiety logged this week");
 
   if (reasons.length === 0) return NextResponse.json({ ok: true, flare: false });

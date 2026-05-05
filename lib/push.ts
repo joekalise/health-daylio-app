@@ -22,13 +22,13 @@ export async function sendToAll(payload: { title: string; body: string; url?: st
       )
     )
   );
-  // Remove expired/invalid subscriptions
+  // Only remove subscriptions that are definitively gone (404/410) — not on transient errors
+  const { eq } = await import("drizzle-orm");
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
-    if (r.status === "rejected" || (r.status === "fulfilled" && [404, 410].includes((r.value as any).statusCode))) {
-      await db.delete(pushSubscriptions).where(
-        (await import("drizzle-orm")).eq(pushSubscriptions.endpoint, subs[i].endpoint)
-      );
+    const statusCode = r.status === "fulfilled" ? (r.value as any).statusCode : (r.reason as any)?.statusCode;
+    if ([404, 410].includes(statusCode)) {
+      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, subs[i].endpoint));
     }
   }
 }

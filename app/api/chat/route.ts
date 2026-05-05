@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { moodEntries, healthMetrics, userProfile, financeBalances, financeAccounts, financeEntries, financeSnapshots } from "@/db/schema";
+import { moodEntries, healthMetrics, userProfile, financeBalances, financeAccounts, financeEntries, financeSnapshots, chatMessages } from "@/db/schema";
 import { gte, lte, and, desc, eq, asc } from "drizzle-orm";
 
 const client = new Anthropic();
@@ -205,7 +205,11 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return new Response("Unauthorized", { status: 401 });
 
-  const { messages } = await req.json();
+  const { message } = await req.json();
+
+  // Save user message and load full history for context
+  await db.insert(chatMessages).values({ role: "user", content: message });
+  const history = await db.select().from(chatMessages).orderBy(asc(chatMessages.createdAt));
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -214,8 +218,9 @@ export async function POST(req: NextRequest) {
       const done = () => { controller.enqueue(encoder.encode("data: [DONE]\n\n")); controller.close(); };
 
       try {
-        let apiMessages: Anthropic.MessageParam[] = messages;
+        let apiMessages: Anthropic.MessageParam[] = history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
         const system = await buildSystem();
+        let fullResponse = "";
 
         // Agentic loop — Claude may call tools multiple times
         while (true) {
@@ -229,7 +234,10 @@ export async function POST(req: NextRequest) {
 
           // Stream text blocks
           for (const block of response.content) {
-            if (block.type === "text") send(block.text);
+            if (block.type === "text") {
+              send(block.text);
+              fullResponse += block.text;
+            }
           }
 
           if (response.stop_reason === "end_turn") break;
@@ -249,6 +257,9 @@ export async function POST(req: NextRequest) {
           }
 
           break;
+        }
+        if (fullResponse) {
+          await db.insert(chatMessages).values({ role: "assistant", content: fullResponse });
         }
       } catch (err) {
         send(`\n\nError: ${err instanceof Error ? err.message : "Unknown error"}`);

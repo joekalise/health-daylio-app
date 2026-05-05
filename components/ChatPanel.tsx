@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,7 +21,16 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initialising, setInitialising] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/chat/history")
+      .then(r => r.json())
+      .then((data: Message[]) => setMessages(data))
+      .catch(() => {})
+      .finally(() => setInitialising(false));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -28,21 +39,18 @@ export default function ChatPanel() {
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Message = { role: "user", content: text };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     const assistantMsg: Message = { role: "assistant", content: "" };
-    setMessages([...newMessages, assistantMsg]);
+    setMessages(prev => [...prev, assistantMsg]);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ message: text }),
       });
 
       const reader = res.body!.getReader();
@@ -62,13 +70,13 @@ export default function ChatPanel() {
           const data = line.slice(6);
           if (data === "[DONE]") break;
           try {
-            const { text } = JSON.parse(data);
-            if (text) {
-              setMessages((prev) => {
+            const { text: chunk } = JSON.parse(data);
+            if (chunk) {
+              setMessages(prev => {
                 const updated = [...prev];
                 updated[updated.length - 1] = {
                   ...updated[updated.length - 1],
-                  content: updated[updated.length - 1].content + text,
+                  content: updated[updated.length - 1].content + chunk,
                 };
                 return updated;
               });
@@ -77,7 +85,7 @@ export default function ChatPanel() {
         }
       }
     } catch {
-      setMessages((prev) => {
+      setMessages(prev => {
         const updated = [...prev];
         updated[updated.length - 1].content = "Sorry, something went wrong.";
         return updated;
@@ -87,11 +95,20 @@ export default function ChatPanel() {
     setLoading(false);
   };
 
+  const clear = async () => {
+    await fetch("/api/chat/history", { method: "DELETE" });
+    setMessages([]);
+  };
+
   return (
     <div className="flex flex-col" style={{ height: "calc(100dvh - 220px)", minHeight: 400 }}>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-2 space-y-4 pr-1">
-        {messages.length === 0 && (
+        {initialising && (
+          <p className="text-xs" style={{ color: "var(--text-dim)" }}>Loading conversation...</p>
+        )}
+
+        {!initialising && messages.length === 0 && (
           <div className="space-y-2 mt-2">
             <p className="text-xs" style={{ color: "var(--text-dim)" }}>Ask anything about your data:</p>
             {SUGGESTIONS.map((s) => (
@@ -110,7 +127,7 @@ export default function ChatPanel() {
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap leading-relaxed ${
+              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                 m.role === "user" ? "rounded-br-sm" : "rounded-bl-sm"
               }`}
               style={m.role === "user"
@@ -118,13 +135,19 @@ export default function ChatPanel() {
                 : { background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }
               }
             >
-              {m.content || (loading && i === messages.length - 1 ? (
+              {m.role === "user" ? (
+                <span className="whitespace-pre-wrap">{m.content}</span>
+              ) : m.content ? (
+                <div className="prose prose-sm max-w-none chat-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                </div>
+              ) : loading && i === messages.length - 1 ? (
                 <span className="inline-flex gap-1 py-0.5">
                   <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "0ms" }} />
                   <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "150ms" }} />
                   <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--text-dim)", animationDelay: "300ms" }} />
                 </span>
-              ) : "")}
+              ) : ""}
             </div>
           </div>
         ))}
@@ -135,7 +158,7 @@ export default function ChatPanel() {
       <div className="pt-3 flex gap-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
         {messages.length > 0 && (
           <button
-            onClick={() => setMessages([])}
+            onClick={clear}
             className="text-xs px-2 py-2 flex-shrink-0 transition-colors"
             style={{ color: "var(--text-muted)" }}
           >

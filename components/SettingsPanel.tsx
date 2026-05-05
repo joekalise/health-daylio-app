@@ -225,25 +225,44 @@ function FireTab() {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 function NotificationsSection() {
-  const [status, setStatus] = useState<"unknown" | "unsupported" | "granted" | "denied" | "default">("unknown");
-  const [subscribing, setSubscribing] = useState(false);
-  const [done, setDone] = useState(false);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [subscribed, setSubscribed] = useState<boolean | null>(null); // null = checking
+  const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState<"sent" | "failed" | null>(null);
 
   useEffect(() => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      setStatus("unsupported");
-    } else {
-      setStatus(Notification.permission as typeof status);
+      setPermission("unsupported");
+      return;
     }
+    setPermission(Notification.permission);
+    if (Notification.permission === "granted") checkSubscription();
   }, []);
 
-  async function enable() {
-    setSubscribing(true);
+  async function checkSubscription() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) { setSubscribed(false); return; }
+      const res = await fetch(`/api/push/status?endpoint=${encodeURIComponent(sub.endpoint)}`);
+      const { active } = await res.json();
+      setSubscribed(active);
+    } catch {
+      setSubscribed(false);
+    }
+  }
+
+  async function subscribe() {
+    setBusy(true);
     try {
       const reg = await navigator.serviceWorker.register("/sw.js");
-      const permission = await Notification.requestPermission();
-      setStatus(permission as typeof status);
-      if (permission !== "granted") { setSubscribing(false); return; }
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+      if (perm !== "granted") { setBusy(false); return; }
+
+      // Unsubscribe any stale browser subscription first
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -254,14 +273,26 @@ function NotificationsSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sub),
       });
-      setDone(true);
+      setSubscribed(true);
     } catch (e) {
       console.error("Push subscribe failed:", e);
     }
-    setSubscribing(false);
+    setBusy(false);
   }
 
-  if (status === "unsupported") return (
+  async function sendTest() {
+    setBusy(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      setTestResult(res.ok ? "sent" : "failed");
+    } catch {
+      setTestResult("failed");
+    }
+    setBusy(false);
+  }
+
+  if (permission === "unsupported") return (
     <p className="text-xs" style={{ color: "var(--text-muted)" }}>Push notifications aren't supported in this browser.</p>
   );
 
@@ -284,22 +315,45 @@ function NotificationsSection() {
         </div>
       </div>
 
-      {status === "granted" ? (
-        <p className="text-xs text-center py-2" style={{ color: "var(--c-positive)" }}>
-          {done ? "✓ Subscribed — notifications are active" : "✓ Notifications already enabled"}
-        </p>
-      ) : status === "denied" ? (
+      {permission === "denied" ? (
         <p className="text-xs text-center py-2" style={{ color: "var(--c-negative)" }}>
-          Notifications blocked — enable them in your browser settings
+          Notifications blocked — enable them in your browser/OS settings then reload
         </p>
+      ) : subscribed ? (
+        <div className="space-y-2">
+          <p className="text-xs text-center py-1" style={{ color: "var(--c-positive)" }}>
+            ✓ Notifications active
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={sendTest}
+              disabled={busy}
+              className="flex-1 py-2.5 rounded-2xl text-sm transition-all disabled:opacity-50"
+              style={{ background: "var(--chip-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }}
+            >
+              {busy ? "Sending…" : "Send test notification"}
+            </button>
+            <button
+              onClick={subscribe}
+              disabled={busy}
+              className="py-2.5 px-3 rounded-2xl text-sm transition-all disabled:opacity-50"
+              style={{ color: "var(--text-muted)" }}
+              title="Re-register subscription"
+            >
+              ↺
+            </button>
+          </div>
+          {testResult === "sent" && <p className="text-xs text-center" style={{ color: "var(--c-positive)" }}>Notification sent — check your device</p>}
+          {testResult === "failed" && <p className="text-xs text-center" style={{ color: "var(--c-negative)" }}>Send failed — check console for errors</p>}
+        </div>
       ) : (
         <button
-          onClick={enable}
-          disabled={subscribing}
+          onClick={subscribe}
+          disabled={busy}
           className="w-full py-3 rounded-2xl font-medium text-sm transition-all disabled:opacity-50"
           style={{ background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)", color: "var(--c-primary)" }}
         >
-          {subscribing ? "Setting up…" : "Enable notifications"}
+          {busy ? "Setting up…" : subscribed === false && permission === "granted" ? "Re-enable notifications" : "Enable notifications"}
         </button>
       )}
     </div>
