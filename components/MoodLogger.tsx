@@ -177,11 +177,15 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
               </button>
             ))}
           </div>
-          {symptom !== null && (
-            <p className="text-xs text-center mt-1.5 font-medium" style={{ color: symptomColor(symptom) }}>
-              {symptom}/10 — {SYMPTOM_LABELS[symptom]}
-            </p>
-          )}
+          {/* Gradient range bar */}
+          <div className="mt-2 h-1.5 rounded-full" style={{ background: "linear-gradient(to right, #34d399 0%, #fbbf24 45%, #fb7185 100%)" }} />
+          <div className="flex justify-between mt-1">
+            <span className="text-[10px] font-medium" style={{ color: "#34d399" }}>None</span>
+            <span className="text-[10px] font-medium" style={{ color: "#fbbf24" }}>
+              {symptom !== null ? `${symptom}/10 — ${SYMPTOM_LABELS[symptom]}` : "Moderate"}
+            </span>
+            <span className="text-[10px] font-medium" style={{ color: "#fb7185" }}>Severe</span>
+          </div>
         </div>
       </div>
 
