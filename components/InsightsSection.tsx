@@ -168,6 +168,7 @@ interface Entry {
 interface Insight {
   title: string;
   body: string;
+  detail?: string;
   category: "mood" | "health" | "finance" | "pattern";
   sentiment: "positive" | "neutral" | "negative";
 }
@@ -198,23 +199,38 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MOOD_ORDER = ["rad", "good", "meh", "bad", "awful"] as const;
 
 function InsightCard({ insight }: { insight: Insight }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl p-4" style={{
-      background: SENTIMENT_BG[insight.sentiment],
-      border: `1px solid ${SENTIMENT_COLOR[insight.sentiment]}30`,
-    }}>
-      <div className="flex items-start gap-3">
-        <span className="text-2xl mt-0.5 flex-shrink-0">{CATEGORY_ICON[insight.category]}</span>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm mb-1" style={{ color: SENTIMENT_COLOR[insight.sentiment] }}>
-            {insight.title}
-          </p>
-          <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+    <button
+      onClick={() => setOpen(o => !o)}
+      className="w-full text-left rounded-2xl p-4 transition-all active:opacity-80"
+      style={{
+        background: SENTIMENT_BG[insight.sentiment],
+        border: `1px solid ${SENTIMENT_COLOR[insight.sentiment]}30`,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-xl flex-shrink-0">{CATEGORY_ICON[insight.category]}</span>
+        <p className="flex-1 font-semibold text-sm" style={{ color: SENTIMENT_COLOR[insight.sentiment] }}>
+          {insight.title}
+        </p>
+        <span className="text-[10px] flex-shrink-0" style={{ color: SENTIMENT_COLOR[insight.sentiment], opacity: 0.7 }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </div>
+      {open && (
+        <div className="mt-3 space-y-2 pl-8">
+          <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>
             {insight.body}
           </p>
+          {insight.detail && (
+            <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+              {insight.detail}
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+      )}
+    </button>
   );
 }
 
@@ -394,7 +410,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
     const poorPairs = sleepMoodPairs.filter(p => p.hrs <= medianHrs);
     const goodAvg = avgArr(goodPairs.map(p => p.mood));
     const poorAvg = avgArr(poorPairs.map(p => p.mood));
-    if (goodAvg !== null && poorAvg !== null) {
+    if (goodAvg !== null && poorAvg !== null && Math.abs(goodAvg - poorAvg) >= 0.2) {
       sleepCorr = { good: goodAvg, poor: poorAvg, nGood: goodPairs.length, nPoor: poorPairs.length, threshold: +medianHrs.toFixed(1) };
     }
   }
@@ -476,7 +492,13 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
 
       {/* Day of week */}
       <div>
-        <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>Mood by Day</p>
+        <div className="flex items-baseline gap-2 mb-3">
+          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--text-muted)" }}>Mood by Day</p>
+          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+            · all time · {entries.length} entries
+            {entries.length > 0 ? ` · ${entries[entries.length - 1].date.slice(0, 7)} → now` : ""}
+          </p>
+        </div>
         <div className="glass rounded-2xl p-4">
           <ResponsiveContainer width="100%" height={110}>
             <BarChart data={dowData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }} barSize={22}>

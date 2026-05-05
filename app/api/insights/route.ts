@@ -115,11 +115,11 @@ export async function GET() {
   try {
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1200,
+      max_tokens: 1800,
       system: `You are a personal analytics assistant for someone with Ankylosing Spondylitis (AS). Generate specific, actionable insights from their life data. Reference actual numbers. Look for AS flare precursors (declining mood + poor sleep + no exercise). Cross-domain patterns are valuable.
 
 Return ONLY valid JSON (no markdown, no code fences):
-{"summary":"2-sentence honest assessment","insights":[{"title":"4-6 word title","body":"2-3 sentences with specific numbers and what to do","category":"mood|health|finance|pattern","sentiment":"positive|neutral|negative"}]}
+{"summary":"2-sentence honest assessment","insights":[{"title":"4-6 word title","body":"1-2 sentences — the headline finding with a key number","detail":"2-3 sentences — the supporting evidence, breakdown, or recommended action. Be specific with numbers.","category":"mood|health|finance|pattern","sentiment":"positive|neutral|negative"}]}
 
 Generate 4-5 insights.`,
       messages: [{ role: "user", content: JSON.stringify(context) }],
