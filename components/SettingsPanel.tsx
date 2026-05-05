@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import ProfileSection from "./ProfileSection";
 
-type Tab = "profile" | "budget" | "fire" | "notifications";
+type Tab = "profile" | "budget" | "fire" | "notifications" | "memory";
 
 // ── Budget tab ────────────────────────────────────────────────────────────────
 interface Entry { id: number; category: string; name: string; value: number; metadata: Record<string, any> | null; }
@@ -374,6 +374,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "budget", label: "Budget" },
   { id: "fire", label: "FIRE" },
   { id: "notifications", label: "Alerts" },
+  { id: "memory", label: "Memory" },
 ];
 
 export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (photo: string) => void }) {
@@ -402,6 +403,65 @@ export default function SettingsPanel({ onPhotoChange }: { onPhotoChange?: (phot
       {tab === "budget" && <BudgetTab />}
       {tab === "fire" && <FireTab />}
       {tab === "notifications" && <NotificationsSection />}
+      {tab === "memory" && <MemorySection />}
+    </div>
+  );
+}
+
+// ── Memory ────────────────────────────────────────────────────────────────────
+function MemorySection() {
+  const [memories, setMemories] = useState<{ id: number; key: string; value: string; updatedAt: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/memory")
+      .then(r => r.json())
+      .then(d => { setMemories(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function remove(key: string) {
+    await fetch("/api/memory", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    setMemories(prev => prev.filter(m => m.key !== key));
+  }
+
+  if (loading) return <p className="text-xs" style={{ color: "var(--text-muted)" }}>Loading…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Claude saves memories here as it learns about you — patterns, preferences, and observations that persist across conversations.
+      </p>
+
+      {memories.length === 0 ? (
+        <div className="rounded-2xl p-5 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-dim)" }}>No memories yet</p>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Start a conversation and Claude will begin remembering things about you.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {memories.map(m => (
+            <div key={m.key} className="rounded-xl p-3 flex gap-3 items-start" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono font-semibold mb-0.5" style={{ color: "var(--c-primary)" }}>{m.key}</p>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>{m.value}</p>
+              </div>
+              <button
+                onClick={() => remove(m.key)}
+                className="flex-shrink-0 text-xs px-2 py-1 rounded-lg transition-all"
+                style={{ color: "var(--text-muted)" }}
+                title="Delete memory"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

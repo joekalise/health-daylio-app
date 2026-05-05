@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { moodEntries, healthMetrics, userProfile, financeBalances, financeAccounts, financeEntries, financeSnapshots, chatMessages } from "@/db/schema";
+import { moodEntries, healthMetrics, userProfile, financeBalances, financeAccounts, financeEntries, financeSnapshots, chatMessages, claudeMemory } from "@/db/schema";
 import { gte, lte, and, desc, eq, asc } from "drizzle-orm";
 
 const client = new Anthropic();
@@ -60,6 +60,29 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {},
+    },
+  },
+  {
+    name: "save_memory",
+    description: "Save or update a persistent memory about this user that will be available in all future conversations. Use this proactively when you notice patterns, the user shares something important, you discover a correlation, or anything that would make you more helpful long-term. Use a short snake_case key (e.g. 'hrv_flare_pattern', 'sleep_mood_correlation'). Keep values concise (1-2 sentences).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        key: { type: "string", description: "Short unique identifier in snake_case" },
+        value: { type: "string", description: "The memory content — concise, factual, 1-2 sentences" },
+      },
+      required: ["key", "value"],
+    },
+  },
+  {
+    name: "delete_memory",
+    description: "Delete a memory that is no longer accurate or relevant.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        key: { type: "string", description: "The key of the memory to delete" },
+      },
+      required: ["key"],
     },
   },
 ];
@@ -169,11 +192,25 @@ async function runTool(name: string, input: Record<string, unknown>) {
     });
   }
 
+  if (name === "save_memory") {
+    const key = input.key as string;
+    const value = input.value as string;
+    await db.insert(claudeMemory).values({ key, value })
+      .onConflictDoUpdate({ target: claudeMemory.key, set: { value, updatedAt: new Date() } });
+    return `Memory saved: ${key}`;
+  }
+
+  if (name === "delete_memory") {
+    await db.delete(claudeMemory).where(eq(claudeMemory.key, input.key as string));
+    return `Memory deleted: ${input.key}`;
+  }
+
   return "Unknown tool";
 }
 
 async function buildSystem(): Promise<string> {
   const [profile] = await db.select().from(userProfile).limit(1);
+  const memories = await db.select().from(claudeMemory).orderBy(asc(claudeMemory.updatedAt));
   const today = new Date().toISOString().split("T")[0];
 
   let profileSection = "";
@@ -191,14 +228,20 @@ async function buildSystem(): Promise<string> {
     if (parts.length) profileSection = `\n\nUser profile:\n${parts.join("\n")}`;
   }
 
+  const memorySection = memories.length > 0
+    ? `\n\n## What you remember about this user\n${memories.map(m => `- ${m.key}: ${m.value}`).join("\n")}`
+    : "";
+
   return `You are a personal analytics assistant for a specific user's life dashboard. You have access to their Apple Health data, mood tracking, and financial data.
 
 Available data:
 - Mood entries: daily mood (rad/good/meh/bad/awful), activities, notes — going back years
-- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, weight
-- Finance: net worth history, account balances (Revolut, Emergency Fund, investments, pension, flat equity), monthly budget (income, expenses, savings allocations)${profileSection}
+- Health metrics: steps, HRV, resting heart rate, sleep, workouts, active energy, weight, AS symptoms (0–10 daily scale)
+- Finance: net worth history, account balances (Revolut, Emergency Fund, investments, pension, flat equity), monthly budget (income, expenses, savings allocations)${profileSection}${memorySection}
 
-Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Factor in the user's health conditions and goals when giving insights. Spot patterns across all domains (e.g. mood vs exercise, savings rate trends, net worth growth). Today's date is ${today}.`;
+Use the tools to look up real data before answering. Be conversational, insightful, and specific — reference actual numbers and dates. Factor in the user's health conditions and goals when giving insights. Spot patterns across all domains (e.g. mood vs exercise, savings rate trends, net worth growth). Today's date is ${today}.
+
+Use save_memory proactively whenever you notice something worth remembering: a pattern in the data, something the user tells you about their life or goals, a correlation you've found, or a preference they express. Use delete_memory if something you've remembered turns out to be wrong. Good memories make you significantly more useful over time.`;
 }
 
 export async function POST(req: NextRequest) {

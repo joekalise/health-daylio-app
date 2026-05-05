@@ -99,6 +99,13 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const claudeMemory = pgTable("claude_memory", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   role: text("role").notNull(), // "user" | "assistant"
