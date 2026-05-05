@@ -9,7 +9,7 @@ import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
 import SettingsPanel from "./SettingsPanel";
 import ChatPanel from "./ChatPanel";
-import PainLogCard from "./PainLogCard";
+import SymptomLog from "./SymptomLog";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays, addDays, startOfWeek } from "date-fns";
 import Link from "next/link";
@@ -33,7 +33,7 @@ interface Props {
 
 const TABS = [
   { id: "Home", emoji: "🏠" },
-  { id: "Mood", emoji: "😊" },
+  { id: "Log", emoji: "📓" },
   { id: "Health", emoji: "💪" },
   { id: "Finance", emoji: "💰" },
   { id: "Insights", emoji: "✨" },
@@ -398,10 +398,10 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
                       <p className="text-xs mt-1 truncate" style={{ color: "var(--text-dim)" }}>{entries[0].activities.slice(0, 4).join(" · ")}</p>
                     )}
                   </div>
-                  <button onClick={() => setTab("Mood")} className="text-xs flex-shrink-0 px-3 py-1.5 rounded-xl" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)" }}>View all →</button>
+                  <button onClick={() => setTab("Log")} className="text-xs flex-shrink-0 px-3 py-1.5 rounded-xl" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)", border: "1px solid var(--c-primary-border)" }}>View all →</button>
                 </div>
               ) : (
-                <button onClick={() => setTab("Mood")} className="w-full text-left">
+                <button onClick={() => setTab("Log")} className="w-full text-left">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-base">How are you feeling?</p>
@@ -416,14 +416,12 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               )}
             </section>
 
-            <PainLogCard />
-
             {/* 7-day mini chart */}
             {chartData.length > 0 && (
               <section className="glass rounded-2xl p-4">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="font-semibold text-sm">Mood · 7 days</h2>
-                  <button onClick={() => { setDays(7); setTab("Mood"); }} className="text-xs px-2 py-1 rounded-lg" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)" }}>Full view →</button>
+                  <button onClick={() => { setDays(7); setTab("Log"); }} className="text-xs px-2 py-1 rounded-lg" style={{ color: "var(--c-primary)", background: "var(--c-primary-dim)" }}>Full view →</button>
                 </div>
                 <MoodChart
                   data={chartData.filter(e => e.date >= subDays(new Date(), 7).toISOString().split("T")[0])}
@@ -517,7 +515,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
             <section className="glass rounded-2xl p-4">
               <div className="flex justify-between items-center mb-3">
                 <h2 className="font-semibold text-sm">Recent entries</h2>
-                <button onClick={() => setTab("Mood")} className="text-xs" style={{ color: "var(--c-primary)" }}>All →</button>
+                <button onClick={() => setTab("Log")} className="text-xs" style={{ color: "var(--c-primary)" }}>All →</button>
               </div>
               <div className="space-y-0">
                 {entries.slice(0, 5).map((e, i) => (
@@ -540,9 +538,11 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
           </>
         )}
 
-        {/* MOOD TAB */}
-        {tab === "Mood" && (
+        {/* LOG TAB */}
+        {tab === "Log" && (
           <>
+            <SymptomLog />
+
             {!todayLogged && (
               <section className="glass rounded-2xl p-5">
                 <h2 className="font-semibold text-lg mb-4 text-center">Log today's mood</h2>
@@ -700,7 +700,7 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
               )}
               <span className={`text-xl transition-all ${tab === id ? "scale-110" : "opacity-50"}`}>{emoji}</span>
               <span className="text-[10px] font-medium tracking-wide" style={{ color: tab === id ? "var(--c-primary)" : "var(--text-muted)" }}>{id}</span>
-              {id === "Mood" && !todayLogged && tab !== "Mood" && (
+              {id === "Log" && !todayLogged && tab !== "Log" && (
                 <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full" style={{ background: "var(--c-primary)" }} />
               )}
             </button>

@@ -18,10 +18,9 @@ export async function GET(req: NextRequest) {
   const entries = await db.select().from(moodEntries).orderBy(desc(moodEntries.date)).limit(90);
   if (entries.length < 7) return NextResponse.json({ skipped: true, reason: "not enough data" });
 
-  const [painRows, stiffnessRows] = await Promise.all([
-    db.select().from(healthMetrics).where(and(gte(healthMetrics.date, d(5)), eq(healthMetrics.type, "pain"))),
-    db.select().from(healthMetrics).where(and(gte(healthMetrics.date, d(5)), eq(healthMetrics.type, "stiffness"))),
-  ]);
+  const symptomRows = await db.select().from(healthMetrics).where(
+    and(gte(healthMetrics.date, d(5)), eq(healthMetrics.type, "symptoms"))
+  );
 
   const last5 = entries.filter(e => e.date >= d(5));
   const last7 = entries.filter(e => e.date >= d(7));
@@ -43,10 +42,8 @@ export async function GET(req: NextRequest) {
   if (hasActivity(last7, "anxiety attack")) reasons.push("anxiety logged this week");
 
   const metricAvg = (rows: { value: number }[]) => rows.length ? rows.reduce((s, r) => s + r.value, 0) / rows.length : null;
-  const avgPain = metricAvg(painRows.filter(r => r.date >= d(3)));
-  const avgStiffness = metricAvg(stiffnessRows.filter(r => r.date >= d(3)));
-  if (avgPain !== null && avgPain >= 5) reasons.push(`pain averaging ${avgPain.toFixed(1)}/10`);
-  if (avgStiffness !== null && avgStiffness >= 6) reasons.push(`stiffness averaging ${avgStiffness.toFixed(1)}/10`);
+  const avgSymptoms = metricAvg(symptomRows.filter(r => r.date >= d(3)));
+  if (avgSymptoms !== null && avgSymptoms >= 5) reasons.push(`symptoms averaging ${avgSymptoms.toFixed(1)}/10`);
 
   if (reasons.length === 0) return NextResponse.json({ ok: true, flare: false });
 

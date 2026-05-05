@@ -231,8 +231,7 @@ export default function HealthSection({ days }: { days: number }) {
   const sleep = groupByDate(metrics, "sleep_total");
   const weight = groupByDate(metrics, "weight");
   const bodyFat = groupByDate(metrics, "body_fat");
-  const pain = groupByDate(metrics, "pain");
-  const stiffness = groupByDate(metrics, "stiffness");
+  const symptoms = groupByDate(metrics, "symptoms");
 
   const daysSinceSync = lastSync
     ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
@@ -285,20 +284,14 @@ export default function HealthSection({ days }: { days: number }) {
         <SleepBar data={sleep} days={days} />
       </div>
 
-      {/* Pain & Stiffness */}
-      {(pain.length > 0 || stiffness.length > 0) && (
+      {/* AS Symptoms */}
+      {symptoms.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>Pain & Stiffness</h3>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            {pain.length > 0 && (
-              <StatCard label="Avg pain" value={avg(pain)?.toFixed(1) ?? null} unit="/ 10" color="var(--c-negative)" trend={trendFor(pain, false)} />
-            )}
-            {stiffness.length > 0 && (
-              <StatCard label="Avg stiffness" value={avg(stiffness)?.toFixed(1) ?? null} unit="/ 10" color="var(--c-caution)" trend={trendFor(stiffness, false)} />
-            )}
+          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-dim)" }}>AS Symptoms</h3>
+          <div className="mb-3">
+            <StatCard label="Avg symptoms" value={avg(symptoms)?.toFixed(1) ?? null} unit="/ 10" color="var(--c-negative)" trend={trendFor(symptoms, false)} />
           </div>
-          {pain.length > 0 && <MiniChart data={pain} color="var(--c-negative)" unit="/10" formatter={(v) => v.toFixed(1)} gradientId="pain-grad" days={days} />}
-          {stiffness.length > 0 && <MiniChart data={stiffness} color="var(--c-caution)" unit="/10" formatter={(v) => v.toFixed(1)} gradientId="stiffness-grad" days={days} />}
+          <MiniChart data={symptoms} color="var(--c-negative)" unit="/10" formatter={(v) => v.toFixed(1)} gradientId="symptoms-grad" days={days} />
         </div>
       )}
 
