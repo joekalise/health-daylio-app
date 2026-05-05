@@ -1,40 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MOOD_COLORS, MOOD_EMOJI } from "@/lib/mood";
 
 const MOODS = ["rad", "good", "meh", "bad", "awful"] as const;
 
 const ACTIVITY_GROUPS = [
-  {
-    label: "😴 Sleep",
-    items: ["good sleep", "medium sleep", "bad sleep", "sleep early", "sleep late"],
-  },
-  {
-    label: "🍽️ Food",
-    items: ["homemade", "eat healthy", "restaurant", "delivery", "fast food", "no sweets", "no meat"],
-  },
-  {
-    label: "👥 Social",
-    items: ["family", "friends", "date", "party", "sex"],
-  },
-  {
-    label: "💪 Fitness",
-    items: ["exercise", "step goal"],
-  },
-  {
-    label: "💼 Work",
-    items: ["work", "coworking"],
-  },
-  {
-    label: "🧘 Health",
-    items: ["drink water", "sick", "anxiety attack"],
-  },
-  {
-    label: "🚫 Avoiding",
-    items: ["no alcohol", "no drugs", "no soda"],
-  },
+  { label: "😴 Sleep", items: ["good sleep", "medium sleep", "bad sleep", "sleep early", "sleep late"] },
+  { label: "🍽️ Food", items: ["homemade", "eat healthy", "restaurant", "delivery", "fast food", "no sweets", "no meat"] },
+  { label: "👥 Social", items: ["family", "friends", "date", "party", "sex"] },
+  { label: "💪 Fitness", items: ["exercise", "step goal"] },
+  { label: "💼 Work", items: ["work", "coworking"] },
+  { label: "🧘 Health", items: ["drink water", "sick", "anxiety attack"] },
+  { label: "🚫 Avoiding", items: ["no alcohol", "no drugs", "no soda"] },
 ];
+
+const SYMPTOM_LABELS = ["None", "Minimal", "Minimal", "Mild", "Mild", "Moderate", "Moderate", "Significant", "Significant", "Severe", "Severe"];
+
+function symptomColor(n: number) {
+  if (n <= 2) return "var(--c-positive)";
+  if (n <= 5) return "var(--c-caution)";
+  return "var(--c-negative)";
+}
 
 export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   const [mood, setMood] = useState<string>("");
@@ -44,13 +31,27 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   const [saved, setSaved] = useState(false);
   const [logDate, setLogDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [step, setStep] = useState<"mood" | "details">("mood");
+  const [symptom, setSymptom] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/health/symptoms")
+      .then(r => r.json())
+      .then(d => { if (d.symptoms != null) setSymptom(d.symptoms); })
+      .catch(() => {});
+  }, []);
 
   const toggle = (a: string) =>
     setActivities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
 
-  const pickMood = (m: string) => {
-    setMood(m);
-    setStep("details");
+  const pickMood = (m: string) => { setMood(m); setStep("details"); };
+
+  const logSymptom = async (n: number) => {
+    setSymptom(n);
+    fetch("/api/health/symptoms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symptoms: n }),
+    }).catch(() => {});
   };
 
   const save = async () => {
@@ -63,12 +64,8 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
     });
     setSaved(true);
     setTimeout(() => {
-      setMood("");
-      setActivities([]);
-      setNote("");
-      setSaving(false);
-      setSaved(false);
-      setStep("mood");
+      setMood(""); setActivities([]); setNote("");
+      setSaving(false); setSaved(false); setStep("mood");
       onSaved();
     }, 800);
   };
@@ -85,7 +82,6 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
   if (step === "mood") {
     return (
       <div className="space-y-5">
-        {/* Date picker */}
         <div className="flex items-center justify-center gap-2">
           <label className="text-xs font-medium" style={{ color: "var(--text-dim)" }}>Logging for</label>
           <input
@@ -97,10 +93,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
             style={{ background: "var(--input-bg)", border: "1px solid var(--chip-border)", color: "var(--text)" }}
           />
         </div>
-
         <p className="text-center text-sm font-medium" style={{ color: "var(--text-dim)" }}>How are you feeling?</p>
-
-        {/* Mood selector */}
         <div className="flex gap-2 justify-center">
           {MOODS.map((m) => (
             <button
@@ -120,7 +113,7 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="space-y-5">
-      {/* Selected mood header — tap to change */}
+      {/* Selected mood header */}
       <button
         onClick={() => setStep("mood")}
         className="w-full flex items-center gap-3 p-3 rounded-2xl transition-all"
@@ -146,8 +139,8 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
       <div className="space-y-4">
         {ACTIVITY_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-sm font-semibold mb-2" style={{ color: "var(--text-dim)" }}>{group.label}</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm font-semibold mb-2 text-center" style={{ color: "var(--text-dim)" }}>{group.label}</p>
+            <div className="flex flex-wrap gap-2 justify-center">
               {group.items.map((a) => (
                 <button
                   key={a}
@@ -164,6 +157,32 @@ export default function MoodLogger({ onSaved }: { onSaved: () => void }) {
             </div>
           </div>
         ))}
+
+        {/* AS Symptoms */}
+        <div>
+          <p className="text-sm font-semibold mb-2 text-center" style={{ color: "var(--text-dim)" }}>🩺 Symptoms</p>
+          <div className="flex gap-1">
+            {Array.from({ length: 11 }, (_, n) => (
+              <button
+                key={n}
+                onClick={() => logSymptom(n)}
+                className="flex-1 h-8 rounded-lg text-xs font-bold transition-all"
+                style={{
+                  background: symptom === n ? symptomColor(n) : "var(--chip-bg)",
+                  color: symptom === n ? "#fff" : "var(--text-muted)",
+                  border: `1px solid ${symptom === n ? symptomColor(n) : "var(--chip-border)"}`,
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          {symptom !== null && (
+            <p className="text-xs text-center mt-1.5 font-medium" style={{ color: symptomColor(symptom) }}>
+              {symptom}/10 — {SYMPTOM_LABELS[symptom]}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Note */}

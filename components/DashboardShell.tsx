@@ -9,7 +9,6 @@ import InsightsSection from "./InsightsSection";
 import FinanceSection from "./FinanceSection";
 import SettingsPanel from "./SettingsPanel";
 import ChatPanel from "./ChatPanel";
-import SymptomLog from "./SymptomLog";
 import { MOOD_EMOJI, MOOD_COLORS } from "@/lib/mood";
 import { format, parseISO, isToday, isYesterday, subDays, addDays, startOfWeek } from "date-fns";
 import Link from "next/link";
@@ -541,11 +540,9 @@ export default function DashboardShell({ entries, chartData, avgScore, streak, t
         {/* LOG TAB */}
         {tab === "Log" && (
           <>
-            <SymptomLog />
-
             {!todayLogged && (
               <section className="glass rounded-2xl p-5">
-                <h2 className="font-semibold text-lg mb-4 text-center">Log today's mood</h2>
+                <h2 className="font-semibold text-lg mb-4 text-center">Log today</h2>
                 <MoodLoggerWrapper />
               </section>
             )}
