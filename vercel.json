@@ -1,12 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/mood-reminder",
-      "schedule": "0 18 * * *"
+      "path": "/api/cron/daily-insight",
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/flare-check",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/mood-reminder",
+      "schedule": "0 18 * * *"
     }
   ]
 }
