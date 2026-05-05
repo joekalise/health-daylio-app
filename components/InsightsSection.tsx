@@ -6,6 +6,150 @@ import { parseISO, getDay, subDays } from "date-fns";
 import { MOOD_COLORS } from "@/lib/mood";
 import { useChartTheme } from "@/lib/chartTheme";
 
+// ── Correlation matrix types ────────────────────────────────────────────────
+interface CorrMetric { key: string; label: string; higherIsBetter: boolean }
+interface ActivityCorr { name: string; r: number; count: number; avgWith: number; avgWithout: number }
+interface CorrData {
+  metrics: CorrMetric[];
+  matrix: Record<string, Record<string, number | null>>;
+  sampleCounts: Record<string, Record<string, number>>;
+  activityCorrs: ActivityCorr[];
+  totalDays: number;
+}
+
+function corrColor(r: number | null): string {
+  if (r === null) return "var(--surface)";
+  const abs = Math.abs(r);
+  if (abs < 0.05) return "var(--surface)";
+  const alpha = Math.min(abs * 1.4, 0.85);
+  if (r > 0) return `rgba(34,197,94,${alpha})`;
+  return `rgba(239,68,68,${alpha})`;
+}
+
+function corrLabel(r: number | null): string {
+  if (r === null || Math.abs(r) < 0.05) return "–";
+  return r > 0 ? `+${r.toFixed(2)}` : r.toFixed(2);
+}
+
+function CorrMatrix({ data }: { data: CorrData }) {
+  const { metrics, matrix, activityCorrs } = data;
+  // Show only lower triangle (skip diagonal + upper)
+  const COL_W = 44;
+
+  return (
+    <div className="space-y-5">
+      {/* Heatmap grid */}
+      <div>
+        <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>
+          Correlation Matrix · {data.totalDays} days
+        </p>
+        <div className="glass rounded-2xl p-3 overflow-x-auto">
+          <table style={{ borderCollapse: "separate", borderSpacing: 3 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 52 }} />
+                {metrics.map(m => (
+                  <th key={m.key} style={{ width: COL_W, fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textAlign: "center", paddingBottom: 4 }}>
+                    {m.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.map((row, ri) => (
+                <tr key={row.key}>
+                  <td style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, paddingRight: 6, textAlign: "right", whiteSpace: "nowrap" }}>
+                    {row.label}
+                  </td>
+                  {metrics.map((col, ci) => {
+                    const r = matrix[row.key]?.[col.key] ?? null;
+                    const isDiag = ri === ci;
+                    const isUpper = ci > ri;
+                    return (
+                      <td key={col.key} style={{ width: COL_W, height: 32, textAlign: "center" }}>
+                        <div style={{
+                          width: COL_W,
+                          height: 32,
+                          borderRadius: 6,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: isDiag ? "var(--divider)" : isUpper ? "transparent" : corrColor(r),
+                        }}>
+                          {!isDiag && !isUpper && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text)", opacity: r === null || Math.abs(r) < 0.05 ? 0.4 : 1 }}>
+                              {corrLabel(r)}
+                            </span>
+                          )}
+                          {isDiag && (
+                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>·</span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="flex items-center gap-3 mt-3 px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded" style={{ background: "rgba(34,197,94,0.7)" }} />
+              <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>positive</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.7)" }} />
+              <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>negative</span>
+            </div>
+            <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>· = self · – = insufficient data</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity correlations with mood */}
+      {activityCorrs.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--text-muted)" }}>
+            Activities vs Mood · Pearson r
+          </p>
+          <div className="glass rounded-2xl p-4 space-y-2">
+            {activityCorrs.map(a => (
+              <div key={a.name} className="flex items-center gap-2">
+                <span className="text-[11px] truncate" style={{ color: "var(--text-dim)", minWidth: 0, flex: 1 }}>{a.name}</span>
+                <div className="flex items-center gap-1 flex-shrink-0" style={{ width: 110 }}>
+                  {/* Bar centred at zero */}
+                  <div style={{ flex: 1, height: 6, borderRadius: 3, position: "relative", background: "var(--divider)" }}>
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      height: 6,
+                      borderRadius: 3,
+                      width: `${Math.abs(a.r) * 50}%`,
+                      left: a.r >= 0 ? "50%" : `${50 - Math.abs(a.r) * 50}%`,
+                      background: a.r >= 0 ? "rgba(34,197,94,0.8)" : "rgba(239,68,68,0.8)",
+                    }} />
+                    <div style={{ position: "absolute", top: -1, left: "50%", width: 1, height: 8, background: "var(--text-muted)", opacity: 0.4 }} />
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold flex-shrink-0" style={{
+                  color: a.r >= 0.1 ? "rgba(34,197,94,1)" : a.r <= -0.1 ? "rgba(239,68,68,1)" : "var(--text-muted)",
+                  width: 34, textAlign: "right",
+                }}>
+                  {corrLabel(a.r)}
+                </span>
+                <span className="text-[9px] flex-shrink-0" style={{ color: "var(--text-muted)", width: 24, textAlign: "right" }}>{a.count}×</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[9px] mt-2 px-1" style={{ color: "var(--text-muted)" }}>
+            r = Pearson correlation (–1 to +1). Min 7 occurrences to appear. Positive = better mood when activity logged.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface HealthMetric {
   id: number;
   date: string;
@@ -124,6 +268,7 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
+  const [corrData, setCorrData] = useState<CorrData | null>(null);
   const theme = useChartTheme();
 
   async function loadInsights() {
@@ -159,6 +304,13 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
     fetch("/api/health/metrics?days=90")
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setHealthMetrics(d); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/correlations")
+      .then(r => r.json())
+      .then(d => { if (d.matrix) setCorrData(d); })
       .catch(() => {});
   }, []);
 
@@ -457,6 +609,12 @@ export default function InsightsSection({ entries }: { entries: Entry[] }) {
           </div>
         </div>
       )}
+
+      {/* Divider before correlations */}
+      {corrData && <div style={{ height: 1, background: "var(--divider)" }} />}
+
+      {/* Pearson correlation matrix */}
+      {corrData && <CorrMatrix data={corrData} />}
 
     </div>
   );
