@@ -228,7 +228,8 @@ function NotificationsSection() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [subscribed, setSubscribed] = useState<boolean | null>(null); // null = checking
   const [busy, setBusy] = useState(false);
-  const [testResult, setTestResult] = useState<"sent" | "failed" | null>(null);
+  const [testResult, setTestResult] = useState<"sent" | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
@@ -283,11 +284,17 @@ function NotificationsSection() {
   async function sendTest() {
     setBusy(true);
     setTestResult(null);
+    setTestError(null);
     try {
       const res = await fetch("/api/push/test", { method: "POST" });
-      setTestResult(res.ok ? "sent" : "failed");
-    } catch {
-      setTestResult("failed");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setTestResult("sent");
+      } else {
+        setTestError(data.error ?? `Server error ${res.status}`);
+      }
+    } catch (e) {
+      setTestError(e instanceof Error ? e.message : "Network error");
     }
     setBusy(false);
   }
@@ -344,7 +351,7 @@ function NotificationsSection() {
             </button>
           </div>
           {testResult === "sent" && <p className="text-xs text-center" style={{ color: "var(--c-positive)" }}>Notification sent — check your device</p>}
-          {testResult === "failed" && <p className="text-xs text-center" style={{ color: "var(--c-negative)" }}>Send failed — check console for errors</p>}
+          {testError && <p className="text-xs text-center" style={{ color: "var(--c-negative)" }}>{testError}</p>}
         </div>
       ) : (
         <button
